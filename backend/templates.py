@@ -51,6 +51,28 @@ TEMPLATES = {
             {"source": "spine02", "target": "leaf02",  "src_if": "1/1/2", "dst_if": "1/1/2", "label": ""},
         ]
     },
+    "junos-p2p": {
+        "name": "JUNOS P2P (2x vJunos-switch)",
+        "description": "Two vJunos-switch back-to-back over ge-0/0/0 (same as the 02 verification). Apply Config sets 10.0.0.0/30 on each end.",
+        "nodes": [
+            {"id": "vsw1", "label": "vSW1", "kind": "juniper_vjunosswitch", "x": 250, "y": 250},
+            {"id": "vsw2", "label": "vSW2", "kind": "juniper_vjunosswitch", "x": 550, "y": 250},
+        ],
+        "links": [
+            {"source": "vsw1", "target": "vsw2", "src_if": "ge-0/0/0", "dst_if": "ge-0/0/0", "label": "P2P 10.0.0.0/30"},
+        ]
+    },
+    "cx-junos-interop": {
+        "name": "CX ↔ JUNOS Interop (AOS-CX + vJunos)",
+        "description": "AOS-CX SW01 (1/1/1) ↔ vJunos vSW1 (ge-0/0/0). L3 P2P interop on 10.0.0.0/30.",
+        "nodes": [
+            {"id": "sw01", "label": "CX SW01", "kind": "vr-aoscx",            "x": 250, "y": 250},
+            {"id": "vsw1", "label": "vSW1",    "kind": "juniper_vjunosswitch", "x": 550, "y": 250},
+        ],
+        "links": [
+            {"source": "sw01", "target": "vsw1", "src_if": "1/1/1", "dst_if": "ge-0/0/0", "label": "interop 10.0.0.0/30"},
+        ]
+    },
     "auth-verify-radius": {
         "name": "Auth Verify (Access+Core+PC+RADIUS)",
         "description": "PC3 -> Access-1 -> Core-1 -> RADIUS. 802.1X/MAC-auth verification (accept-all template)",

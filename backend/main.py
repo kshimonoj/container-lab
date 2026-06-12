@@ -12,9 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from lab_manager import (
-    apply_default_config, deploy_lab, destroy_lab, exec_command,
-    export_topology_yaml, get_lab_status, get_node_live_info, get_node_ssh_info,
-    get_radius_summary, import_topology_yaml, list_labs, list_running_labs,
+    apply_default_config, deploy_lab, destroy_lab, estimate_resources,
+    exec_command, export_topology_yaml, get_lab_status, get_node_live_info,
+    get_node_ssh_info, get_radius_summary, import_topology_yaml, list_drivers,
+    list_labs, list_running_labs,
 )
 from templates import TEMPLATES
 
@@ -43,6 +44,21 @@ async def get_template(template_id: str):
     return TEMPLATES[template_id]
 
 
+# ── Drivers (node kinds the GUI can place) ─────────────────────
+@app.get("/api/drivers")
+async def get_drivers():
+    return {"drivers": list_drivers()}
+
+
+# ── Resource estimate (pre-deploy guard) ───────────────────────
+class EstimateRequest(BaseModel):
+    topology: dict
+
+@app.post("/api/resources/estimate")
+async def resources_estimate(req: EstimateRequest):
+    return estimate_resources(req.topology)
+
+
 # ── Labs ───────────────────────────────────────────────────────
 @app.get("/api/labs")
 async def get_labs():
@@ -54,8 +70,9 @@ def api_list_running_labs():
     return {"labs": list_running_labs()}
 
 @app.get("/api/labs/{lab_name}/nodes/{node_id}/live")
-def api_node_live(lab_name: str, node_id: str, kind: str = "aruba_aoscx"):
-    """Node live info (for the Refresh button). kind=linux fetches PC-style output."""
+def api_node_live(lab_name: str, node_id: str, kind: str = ""):
+    """Node live info (for the Refresh button). The driver is resolved from the
+    live container kind; `kind` is only a hint used if the container is gone."""
     return get_node_live_info(lab_name, node_id, kind)
 
 @app.get("/api/labs/{lab_name}/topology")

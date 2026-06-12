@@ -25,6 +25,29 @@ function roleFromNode(nodeData) {
   return '';
 }
 
+// ── Driver metadata (kinds the GUI can place) ────────────────
+// { kind: {display_name, image, is_vm, boot_timeout_sec, ram_gib, boot_hint} }
+let driversCache = {};
+
+function kindMeta(kind) {
+  return driversCache[kind] || null;
+}
+
+// Short badge {text, cls} shown in the node list per kind
+function kindBadge(kind) {
+  if (kind === 'linux')                  return { text: 'PC',     cls: 'kind-linux' };
+  if (kind === 'juniper_vjunosswitch')   return { text: 'vJunos', cls: 'kind-junos' };
+  return { text: 'CX', cls: 'kind-cx' };
+}
+
+function kindDisplay(kind) {
+  const m = kindMeta(kind);
+  if (m) return m.display_name;
+  if (kind === 'linux')                return 'PC (linux)';
+  if (kind === 'juniper_vjunosswitch') return 'vJunos-switch';
+  return 'AOS-CX';
+}
+
 // ── State ────────────────────────────────────────────────────
 let cy           = null;
 let topology     = { nodes: [], links: [] };
@@ -49,6 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLogToggle();
   initTermViewModeButtons();
   initSplitters();
+  await loadDrivers();
   await loadTemplates();
   bindButtons();
   bindExecBar();
@@ -103,6 +127,9 @@ function initCytoscape() {
       }},
       { selector: 'node[kind="linux"]', style: {
         'border-color': '#58a6ff', 'shape': 'ellipse',
+      }},
+      { selector: 'node[kind="juniper_vjunosswitch"]', style: {
+        'border-color': '#84b135', 'background-color': '#222a14', 'shape': 'hexagon',
       }},
       { selector: 'node[role="radius"]', style: {
         'border-color': '#d29922', 'background-color': '#2d2410', 'shape': 'round-diamond',
@@ -329,9 +356,10 @@ function updateNodeList() {
   topology.nodes.forEach(n => {
     const item = document.createElement('div');
     item.className = 'node-item';
+    const badge = kindBadge(n.kind);
     item.innerHTML = `
       <div class="node-dot" id="dot-${n.id}" title="unknown"></div>
-      <span class="node-kind-badge ${n.kind === 'linux' ? 'kind-linux' : 'kind-cx'}">${n.kind === 'linux' ? 'PC' : 'CX'}</span>
+      <span class="node-kind-badge ${badge.cls}">${badge.text}</span>
       <span>${n.label || n.id}</span>
     `;
     item.onclick = () => {
@@ -382,7 +410,9 @@ function updateNodeStatus(containers) {
         healthyCount++;
       } else if (c.State === 'running') {
         dot.style.background = '#e3b341';
-        dot.title = `running / ${health || 'starting'} ⏳`;
+        const meta = kindMeta(n.kind);
+        const hint = (!isLinux && meta && meta.boot_hint) ? ` — ${meta.boot_hint}` : '';
+        dot.title = `booting / ${health || 'starting'} ⏳${hint}`;
         cy.getElementById(n.id).removeClass('running');
       } else {
         dot.style.background = '#f85149';
@@ -425,6 +455,23 @@ function startHealthPolling() {
 }
 function stopHealthPolling() {
   if (healthPoller) { clearInterval(healthPoller); healthPoller = null; }
+}
+
+// ── Drivers ──────────────────────────────────────────────────
+async function loadDrivers() {
+  try {
+    const res  = await fetch(`${API}/api/drivers`);
+    const data = await res.json();
+    driversCache = {};
+    (data.drivers || []).forEach(d => { driversCache[d.kind] = d; });
+    // populate the Add Node kind dropdown from the registry
+    const sel = document.getElementById('new-node-kind');
+    if (sel && (data.drivers || []).length) {
+      sel.innerHTML = data.drivers
+        .map(d => `<option value="${d.kind}">${d.display_name} (${d.kind})</option>`)
+        .join('');
+    }
+  } catch(e) { log('Failed to load drivers: ' + e, 'error'); }
 }
 
 // ── Templates ────────────────────────────────────────────────
@@ -725,6 +772,29 @@ function bindButtons() {
     const labName = currentLabName();
     if (topology.nodes.length === 0) { log('No nodes in topology', 'warn'); return; }
     syncTopologyFromCy();
+
+    // resource guard: estimate RAM vs host availability before deploying
+    try {
+      const est = await fetch(`${API}/api/resources/estimate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topology }),
+      });
+      const e = await est.json();
+      if (e.warning) {
+        if (!confirm(`⚠ ${e.warning}\n\nDeploy anyway?`)) {
+          log(`Deploy cancelled (resource guard): ${e.warning}`, 'warn');
+          return;
+        }
+        log(`⚠ ${e.warning}`, 'warn');
+      } else {
+        log(`Resource estimate: ~${e.required_gib} GiB required / ${e.available_gib} GiB available`, 'info');
+      }
+    } catch(e) { /* estimate is best-effort; never block deploy on its failure */ }
+
+    // boot-time hint for slow VM nodes (vJunos ~2-3 min)
+    const slow = topology.nodes.filter(n => { const m = kindMeta(n.kind); return m && m.is_vm && m.boot_timeout_sec >= 600; });
+    if (slow.length) log(`⏳ ${slow.length} vJunos node(s) will take ~2-3 min to boot — health is polled automatically.`, 'warn');
+
     log(`▶ Deploying lab: ${labName} ...`, 'deploy');
     setStatus('deploying');
     document.getElementById('btn-deploy').disabled = true;
@@ -1197,7 +1267,7 @@ function showNodeDetail(nodeId) {
   const c = document.getElementById('detail-content');
   c.classList.remove('hidden');
 
-  const kindLabel = isLinux ? 'PC (linux)' : `CX (${kind})`;
+  const kindLabel = `${kindDisplay(kind)} (${escapeHtml(kind)})`;
   const stateTxt  = (meta.state || '-') + (meta.status ? ' / ' + meta.status : '');
 
   c.innerHTML = `
@@ -1293,9 +1363,13 @@ function detailTable(title, headers, rows, rawText) {
 
 function renderLive(d, isLinux) {
   const E = escapeHtml;
+  const verRow = (d.version)
+    ? `<div class="detail-row"><span class="detail-key">Version</span><span class="detail-val">${E(d.version)}</span></div>`
+    : '';
   let h = `<div class="detail-section" style="margin-top:8px">
       <div class="detail-section-title">Deploy Info</div>
       <div class="detail-row"><span class="detail-key">State</span><span class="detail-val">${E(d.deploy_state || '-')}</span></div>
+      ${verRow}
     </div>`;
 
   if (!isLinux) {
