@@ -1,0 +1,7 @@
+# --- MAC-auth: あらゆるMAC(User-Name)を無条件で受理 ---
+DEFAULT  Auth-Type := Accept
+         Reply-Message = "clab MAC-auth accept-all"
+
+# --- 802.1X 用テストユーザ ---
+testuser  Cleartext-Password := "labpassword"
+          Reply-Message = "clab dot1x test user"

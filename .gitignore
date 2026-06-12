@@ -9,13 +9,8 @@
 id_*
 *.crt
 
-# === RADIUS secrets (shared secret, clients, users) ===
-configs/freeradius/
-**/clients.conf
-**/authorize
-
-# === site-specific generated configs (internal IPs / mac / topology specifics) ===
-configs/defaults/
+# === lab configs (freeradius, per-template defaults) are now tracked ===
+# RADIUS shared secret is a lab value ('labpassword'); real .env values stay ignored.
 
 # === internal instruction docs (numbered) and history (contain secrets / internal IPs) ===
 [0-9][0-9][0-9]_*.md
