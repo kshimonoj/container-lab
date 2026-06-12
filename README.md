@@ -42,11 +42,12 @@ docker compose up -d --build
 
 ## Security
 
-- Real secrets are **never** committed. `.gitignore` excludes `.env`,
-  `configs/freeradius/` (RADIUS shared secret), `configs/defaults/` (site-specific
-  configs with internal IPs), `labs/` runtime artifacts, the vendored `vrnetlab/`, and the
-  large `OVA/` appliance image.
-- Provide your own RADIUS shared secret and switch credentials locally.
+- Real secrets are **never** committed. `.gitignore` excludes the real `.env`,
+  `labs/` runtime artifacts, the vendored `vrnetlab/`, and the large `OVA/` appliance image.
+- The bundled `configs/freeradius/` and `configs/defaults/` are **lab defaults**: the RADIUS
+  shared secret is the placeholder value `labpassword` and the lab login is the AOS-CX factory
+  `admin/admin`. **Change these before any non-lab use.**
+- Lab-internal IPs (`10.1.x.x`) are kept as-is for out-of-the-box reproducibility.
 
 ## License
 
