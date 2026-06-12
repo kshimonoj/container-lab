@@ -1,0 +1,54 @@
+# === secrets / env ===
+.env
+.env.*
+!.env.example
+*.env
+**/secrets/**
+*.key
+*.pem
+id_*
+*.crt
+
+# === RADIUS secrets (shared secret, clients, users) ===
+configs/freeradius/
+**/clients.conf
+**/authorize
+
+# === site-specific generated configs (internal IPs / mac / topology specifics) ===
+configs/defaults/
+
+# === internal instruction docs (numbered) and history (contain secrets / internal IPs) ===
+[0-9][0-9][0-9]_*.md
+docs/history/
+docs/
+
+# === large appliance images (exceed GitHub 100MB limit) ===
+OVA/
+*.ova
+
+# === lab runtime artifacts ===
+labs/
+*.log
+deploy.log
+aoscx-build.log
+
+# === backups created during 008-010 work ===
+*.bak
+*.bak.*
+cx-clab.bak.*
+
+# === python / caches ===
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# === vendored external project (do not push) ===
+vrnetlab/
+
+# === OS / editor ===
+.DS_Store
+*.swp
+.idea/
+.vscode/

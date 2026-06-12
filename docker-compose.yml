@@ -1,0 +1,18 @@
+services:
+  cx-clab-gui:
+    build: .
+    container_name: cx-clab-gui
+    privileged: true
+    network_mode: host
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/kshimono/claude/cx-clab/labs:/home/kshimono/claude/cx-clab/labs
+      - /home/kshimono/claude/cx-clab/configs:/home/kshimono/claude/cx-clab/configs
+      - /lib/modules:/lib/modules:ro
+      - ./frontend:/app/frontend
+      - ./backend:/app/backend
+    restart: unless-stopped
+    environment:
+      - AOSCX_SSH_USER=admin
+      - AOSCX_SSH_PASS=admin

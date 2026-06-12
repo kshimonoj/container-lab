@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CX ContainerLab</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.19.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@4.19.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <header id="header">
+    <div class="header-left">
+      <span class="logo">⬡ CX-CLAB</span>
+      <span class="subtitle">ContainerLab GUI for AOS-CX</span>
+    </div>
+    <div class="header-right">
+      <span id="status-badge" class="badge badge-idle">IDLE</span>
+    </div>
+  </header>
+  <div id="main-layout">
+    <aside id="sidebar">
+      <section class="sidebar-section">
+        <div class="section-title">LAB</div>
+        <label>Running Labs</label>
+        <div style="display:flex;gap:4px">
+          <select id="running-lab-select" style="flex:1"><option value="">-- Select --</option></select>
+          <button id="btn-refresh-running" class="btn btn-secondary small" title="Refresh list">↻</button>
+        </div>
+        <button id="btn-load-running" class="btn btn-secondary full-width">▼ Load Running Lab</button>
+        <label style="margin-top:10px">Lab Name</label>
+        <input id="lab-name" type="text" value="mylab" placeholder="lab name">
+        <div class="btn-group">
+          <button id="btn-deploy"  class="btn btn-primary">▶ Deploy</button>
+          <button id="btn-destroy" class="btn btn-danger">✕ Destroy</button>
+          <button id="btn-refresh" class="btn btn-secondary">↻ Status</button>
+        </div>
+        <button id="btn-apply-config" class="btn btn-primary full-width" title="Push the selected template's default config to running nodes">⚙ Apply Config</button>
+      </section>
+      <section class="sidebar-section">
+        <div class="section-title">TEMPLATES</div>
+        <select id="template-select"><option value="">-- Select --</option></select>
+        <button id="btn-load-template" class="btn btn-secondary full-width">Load</button>
+      </section>
+      <section class="sidebar-section">
+        <div class="section-title">TOPOLOGY</div>
+        <div class="btn-group-vertical">
+          <button id="btn-add-node"    class="btn btn-secondary">＋ Node</button>
+          <button id="btn-add-radius"  class="btn btn-secondary">＋ RADIUS (linux)</button>
+          <button id="btn-add-link"    class="btn btn-secondary">🔗 Link <span class="hint-text">src→dst</span></button>
+          <button id="btn-export-yaml" class="btn btn-secondary">↓ Export YAML</button>
+          <button id="btn-import-yaml" class="btn btn-secondary">↑ Import YAML</button>
+          <button id="btn-clear"       class="btn btn-secondary">⊘ Clear</button>
+        </div>
+      </section>
+      <section class="sidebar-section">
+        <div class="section-title">TERMINAL</div>
+        <div class="term-view-btns">
+          <button class="btn btn-secondary small term-view-btn active" data-mode="tabs">Tabs</button>
+          <button class="btn btn-secondary small term-view-btn" data-mode="split">Split</button>
+          <button class="btn btn-secondary small term-view-btn" data-mode="window">Window</button>
+        </div>
+        <div class="btn-group-vertical" style="margin-top:6px">
+          <button id="btn-open-all-terms" class="btn btn-secondary">⬛ Open All</button>
+          <label class="sync-label">
+            <input type="checkbox" id="sync-mode"> Sync input to all
+          </label>
+        </div>
+      </section>
+      <section class="sidebar-section">
+        <div class="section-title">NODES <span id="health-badge" style="float:right;font-size:10px;font-family:var(--font-mono)"></span></div>
+        <div id="node-list"></div>
+      </section>
+    </aside>
+    <div id="center-column">
+      <div id="canvas-area">
+        <div id="cy"></div>
+        <div id="canvas-hint">Load a template or add a node<br><small>Double-click → terminal · Right-click → menu</small></div>
+        <div id="link-mode-banner" class="hidden">🔗 LINK MODE: click the source node</div>
+        <div id="ctx-menu" class="hidden">
+          <div class="ctx-item" id="ctx-terminal">⬛ Open Terminal</div>
+          <div class="ctx-item" id="ctx-exec">⌨ Quick Exec</div>
+          <div class="ctx-divider"></div>
+          <div class="ctx-item" id="ctx-add-link-from">🔗 Add Link from here</div>
+          <div class="ctx-divider"></div>
+          <div class="ctx-item ctx-danger" id="ctx-del-node">🗑 Delete Node</div>
+        </div>
+        <div id="ctx-edge-menu" class="hidden">
+          <div class="ctx-item ctx-danger" id="ctx-del-edge">🗑 Delete Link</div>
+        </div>
+      </div>
+      <div id="splitter-v" title="Drag to resize height"></div>
+      <div id="term-panel">
+        <div id="term-panel-header">
+          <div id="term-tabs-bar">
+            <span class="section-title" style="margin:0;flex-shrink:0">TERMINALS</span>
+            <div id="term-tabs"></div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button id="btn-term-fullscreen" class="btn btn-secondary small" title="Open in window">⤢</button>
+            <button id="btn-close-all-terms" class="btn btn-secondary small">Close All</button>
+          </div>
+        </div>
+        <div id="term-contents"></div>
+        <div id="term-exec-bar">
+          <select id="exec-node-select" style="flex:0 0 110px"></select>
+          <input id="exec-command" type="text" placeholder="show version" style="flex:1">
+          <button id="btn-exec" class="btn btn-primary small">Run</button>
+        </div>
+      </div>
+    </div>
+    <div id="splitter-h" title="Drag to resize width"></div>
+    <div id="right-column">
+      <div id="detail-panel">
+        <div id="detail-empty" class="detail-empty">Select a node / PC to see details</div>
+        <div id="detail-content" class="hidden"></div>
+      </div>
+      <div id="log-panel">
+        <div id="log-panel-header">
+          <span class="section-title" style="margin:0">LOG</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button id="btn-clear-log" class="btn btn-secondary small">Clear</button>
+            <button id="btn-toggle-log" class="btn btn-secondary small">▼</button>
+          </div>
+        </div>
+        <div id="log-output"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Node -->
+<div id="modal-add-node" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title">Add Node</div>
+    <label>Node ID (e.g. sw01)</label>
+    <input id="new-node-id" type="text" placeholder="sw01">
+    <label>Label</label>
+    <input id="new-node-label" type="text" placeholder="Core SW01">
+    <label>Kind</label>
+    <select id="new-node-kind">
+      <option value="vr-aoscx">vr-aoscx (AOS-CX)</option>
+      <option value="linux">linux (PC/Host)</option>
+    </select>
+    <div class="modal-actions">
+      <button id="btn-modal-add" class="btn btn-primary">Add</button>
+      <button id="btn-modal-cancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Link -->
+<div id="modal-add-link" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title">Add Link</div>
+    <label>Source Node</label><select id="link-src-node"></select>
+    <label>Source Interface</label><input id="link-src-if" type="text" placeholder="1/1/1">
+    <label>Target Node</label><select id="link-dst-node"></select>
+    <label>Target Interface</label><input id="link-dst-if" type="text" placeholder="1/1/1">
+    <div class="modal-actions">
+      <button id="btn-modal-link-add" class="btn btn-primary">Add Link</button>
+      <button id="btn-modal-link-cancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import YAML -->
+<div id="modal-import" class="modal hidden">
+  <div class="modal-box modal-large">
+    <div class="modal-title">Import ContainerLab YAML</div>
+    <textarea id="import-yaml-text" placeholder="Paste ContainerLab YAML here..."></textarea>
+    <div class="modal-actions">
+      <button id="btn-modal-import" class="btn btn-primary">Import</button>
+      <button id="btn-modal-import-cancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Fullscreen Terminal -->
+<div id="modal-fullterm" class="modal hidden">
+  <div class="modal-box modal-fullterm">
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span id="fullterm-label">Terminal</span>
+      <button id="btn-fullterm-close" class="btn btn-secondary small">✕ Close</button>
+    </div>
+    <div id="fullterm-container"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

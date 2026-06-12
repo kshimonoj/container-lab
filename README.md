@@ -1,0 +1,53 @@
+# CX ContainerLab GUI
+
+A web GUI for building, deploying, and operating Aruba/HPE **AOS-CX** topologies on
+[ContainerLab](https://containerlab.dev/). Built with **FastAPI** (backend), and
+**Cytoscape.js** + **xterm.js** (frontend).
+
+> ⚠️ This is a lab tool. It ships **no real credentials or secrets**. The factory-default
+> `admin/admin` AOS-CX login and a placeholder RADIUS shared secret are the only credentials
+> referenced, and the real `.env` / RADIUS config are git-ignored. See **Security** below.
+
+## Features
+
+- **Lab management** — deploy / destroy / status, with a running-lab selector.
+- **Topology view** — YAML-driven link drawing on an interactive Cytoscape.js canvas.
+- **Terminals** — WebSocket-backed `xterm.js` consoles to each node.
+- **Node detail panel** — live information pulled over SSH from the selected node.
+- **Templates** — `simple-l2`, `spine-leaf`, `vsx-mclag`, `auth-verify-radius`, each with
+  one-click **Apply Config**.
+
+## Layout
+
+```
+backend/      FastAPI app (main.py, lab_manager.py, templates.py)
+frontend/     Cytoscape.js + xterm.js single-page UI
+Dockerfile    Builds the GUI image (bundles containerlab + docker CLI)
+docker-compose.yml
+```
+
+## Requirements
+
+- Docker (the GUI container needs the Docker socket and host networking).
+- An AOS-CX container image imported into your local Docker (e.g. via `vrnetlab`).
+- The AOS-CX `.ova` appliance image is **not** included in this repo.
+
+## Quick start
+
+```bash
+cp .env.example .env        # adjust credentials
+docker compose up -d --build
+# open http://<host>:8888
+```
+
+## Security
+
+- Real secrets are **never** committed. `.gitignore` excludes `.env`,
+  `configs/freeradius/` (RADIUS shared secret), `configs/defaults/` (site-specific
+  configs with internal IPs), `labs/` runtime artifacts, the vendored `vrnetlab/`, and the
+  large `OVA/` appliance image.
+- Provide your own RADIUS shared secret and switch credentials locally.
+
+## License
+
+For internal lab use.
