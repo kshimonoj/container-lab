@@ -42,6 +42,7 @@
           <button id="btn-refresh" class="btn btn-secondary">↻ Status</button>
         </div>
         <button id="btn-apply-config" class="btn btn-primary full-width" title="Push the selected template's default config to running nodes">⚙ Apply Config</button>
+        <button id="btn-preview-config" class="btn btn-secondary full-width" title="Preview the config that Apply Config would push (read-only)">👁 Preview Config</button>
       </section>
       <section class="sidebar-section">
         <div class="section-title">TEMPLATES</div>
@@ -179,6 +180,21 @@
     <div class="modal-actions">
       <button id="btn-modal-import" class="btn btn-primary">Import</button>
       <button id="btn-modal-import-cancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Config Preview -->
+<div id="modal-config-preview" class="modal hidden">
+  <div class="modal-box modal-large">
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span id="config-preview-title">Config Preview</span>
+      <button id="btn-config-preview-close" class="btn btn-secondary small">✕ Close</button>
+    </div>
+    <div id="config-preview-body" class="config-preview-body"></div>
+    <div class="modal-actions">
+      <button id="btn-config-preview-apply" class="btn btn-primary">⚙ Apply This Config</button>
+      <button id="btn-config-preview-cancel" class="btn btn-secondary">Cancel</button>
     </div>
   </div>
 </div>

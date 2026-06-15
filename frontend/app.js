@@ -435,23 +435,61 @@ function updateNodeStatus(containers) {
 }
 
 // ── Health polling ────────────────────────────────────────────
+// Polls node health every 10s. Once all nodes are healthy it auto-loads the
+// running info (Image / Mgmt IP / State) into nodeMeta so the detail panel no
+// longer shows "-" after a fresh Deploy. Gives up after HEALTH_POLL_TIMEOUT_MS
+// (vJunos boots slowly), telling the user to use Load Running Lab manually.
+const HEALTH_POLL_TIMEOUT_MS = 5 * 60 * 1000;  // 5 min
 function startHealthPolling() {
   stopHealthPolling();
   log('🔄 Polling node health every 10s...', 'info');
+  const labName   = currentLabName();
+  const startedAt = Date.now();
   const tick = async () => {
     try {
-      const res  = await fetch(`${API}/api/labs/${currentLabName()}/status`);
+      const res  = await fetch(`${API}/api/labs/${labName}/status`);
       const data = await res.json();
       const { healthyCount, totalCount } = updateNodeStatus(data.containers);
       if (healthyCount === totalCount && totalCount > 0) {
         log(`✅ All ${totalCount} nodes are ready! Terminals are accessible.`, 'deploy');
         stopHealthPolling();
         setStatus('running');
+        // auto-load: fill nodeMeta (Image / Mgmt IP / State) without re-deploying
+        const ok = await refreshNodeMeta(labName);
+        if (ok) {
+          log('📥 Node details auto-loaded (Image / Mgmt IP / State).', 'success');
+          renderBanner(`✅ ${labName}: all ${totalCount} nodes ready — details loaded`, true, 15000);
+        }
+      } else if (Date.now() - startedAt > HEALTH_POLL_TIMEOUT_MS) {
+        stopHealthPolling();
+        log(`⏱ Nodes not all healthy after 5 min (${healthyCount}/${totalCount}). ` +
+            `起動が遅れています。完了後に「Load Running Lab」で詳細を取得してください。`, 'warn');
+        renderBanner(`⏱ ${labName}: ${healthyCount}/${totalCount} ready — timed out, use Load Running Lab`, false, 20000);
+      } else if (totalCount > 0) {
+        log(`⏳ ノード起動中... ${healthyCount}/${totalCount} ready (vJunos は約2分)`, 'info');
       }
     } catch(e) {}
   };
   tick();  // run once immediately, then every 10s
   healthPoller = setInterval(tick, 10000);
+}
+
+// Refresh nodeMeta for a lab from /api/labs/running without reloading the
+// topology, then re-render the open node detail panel so its top fields update.
+async function refreshNodeMeta(labName) {
+  try {
+    const res  = await fetch(`${API}/api/labs/running`);
+    const data = await res.json();
+    runningLabsCache = data.labs || [];
+    const labInfo = runningLabsCache.find(l => l.name === labName);
+    if (!labInfo) return false;
+    nodeMeta = {};
+    labInfo.nodes.forEach(n => { nodeMeta[n.name] = n; });
+    if (selectedNode) {
+      try { showNodeDetail(selectedNode.id()); } catch(e) {}
+    }
+    return true;
+  } catch(e) { return false; }
 }
 function stopHealthPolling() {
   if (healthPoller) { clearInterval(healthPoller); healthPoller = null; }
@@ -866,12 +904,24 @@ function bindButtons() {
 
   // Apply Config (push the selected template's default config to running nodes)
   document.getElementById('btn-apply-config').onclick = applyConfig;
+  // Preview Config (read-only view of what Apply Config would push)
+  document.getElementById('btn-preview-config').onclick = previewConfig;
   // Disabled until a template is selected
-  const applyBtn  = document.getElementById('btn-apply-config');
-  const tplSelect = document.getElementById('template-select');
-  const syncApplyBtn = () => { applyBtn.disabled = !tplSelect.value; };
+  const applyBtn   = document.getElementById('btn-apply-config');
+  const previewBtn = document.getElementById('btn-preview-config');
+  const tplSelect  = document.getElementById('template-select');
+  const syncApplyBtn = () => {
+    applyBtn.disabled = !tplSelect.value;
+    previewBtn.disabled = !tplSelect.value;
+  };
   tplSelect.addEventListener('change', syncApplyBtn);
   syncApplyBtn();
+
+  // Config Preview modal close / cancel / apply-from-modal
+  const closePreview = () => document.getElementById('modal-config-preview').classList.add('hidden');
+  document.getElementById('btn-config-preview-close').onclick = closePreview;
+  document.getElementById('btn-config-preview-cancel').onclick = closePreview;
+  document.getElementById('btn-config-preview-apply').onclick = () => { closePreview(); applyConfig(); };
 
   // Load template
   document.getElementById('btn-load-template').onclick = async () => {
@@ -1143,6 +1193,57 @@ async function applyConfig() {
     btn.disabled = false;
     btn.textContent = orig;
   }
+}
+
+// ── Preview Config ────────────────────────────────────────────
+// Read-only view of the per-node default config that Apply Config would push.
+async function previewConfig() {
+  const labName    = currentLabName();
+  const templateId = document.getElementById('template-select').value;
+  if (!templateId) { log('Select a template first', 'warn'); return; }
+
+  log(`👁 Loading config preview for "${templateId}"...`, 'info');
+  try {
+    const res = await fetch(
+      `${API}/api/labs/${labName}/config-preview?template_id=${encodeURIComponent(templateId)}`);
+    const data = await res.json();
+    if (!res.ok) { log(`❌ Preview failed: ${data.detail || res.status}`, 'error'); return; }
+    if (data.error) { log(`❌ ${data.error}`, 'error'); return; }
+    renderConfigPreview(data);
+    document.getElementById('modal-config-preview').classList.remove('hidden');
+  } catch(e) {
+    log('Preview error: ' + e, 'error');
+  }
+}
+
+function renderConfigPreview(data) {
+  const E = escapeHtml;
+  const nodes = data.nodes || [];
+  document.getElementById('config-preview-title').textContent =
+    `Config Preview — ${data.template_id} (${nodes.length} nodes)`;
+  const body = document.getElementById('config-preview-body');
+  if (!nodes.length) {
+    body.innerHTML = '<div class="detail-empty">No config files for this template.</div>';
+    return;
+  }
+  body.innerHTML = nodes.map(n => {
+    const hasCfg = n.content != null && n.content !== '';
+    const badge  = `<span class="cfg-kind-badge">${E(n.kind || '-')}</span>`;
+    const file   = n.config_file ? E(n.config_file) : '（設定なし）';
+    const inner  = hasCfg
+      ? `<pre class="cfg-preview-pre">${E(n.content)}</pre>`
+      : `<div class="cfg-preview-none">設定なし (no config file)</div>`;
+    return `
+      <div class="cfg-preview-node">
+        <div class="cfg-preview-head">
+          <span class="cfg-preview-node-id">${E(n.label || n.node_id)}</span>
+          <span class="cfg-preview-node-sub">${E(n.node_id)}</span>
+          ${badge}
+          <span class="cfg-preview-file">${file}</span>
+        </div>
+        ${inner}
+      </div>`;
+  }).join('');
 }
 
 // ── Splitters (drag resize) ───────────────────────────────────
@@ -1446,7 +1547,9 @@ async function fetchNodeLive(nodeId, kind) {
 }
 
 // ── Deploy banner ─────────────────────────────────────────────
-function showDeployBanner(labName, success) {
+// Single floating banner over the canvas. Reused for the deploy result and for
+// the health-polling completion / timeout updates (improvement ①).
+function renderBanner(text, success, hideMs) {
   const existing = document.getElementById('deploy-banner');
   if (existing) existing.remove();
   const banner = document.createElement('div');
@@ -1460,9 +1563,19 @@ function showDeployBanner(labName, success) {
       ? 'background:#1f3a2a;border:1px solid #3fb950;color:#3fb950;'
       : 'background:#2d1a1a;border:1px solid #f85149;color:#f85149;'}
   `;
-  banner.textContent = success
-    ? `✅ Deploy complete: ${labName} — Polling health every 10s...`
-    : `❌ Deploy failed: ${labName}`;
+  banner.textContent = text;
   document.getElementById('canvas-area').appendChild(banner);
-  setTimeout(() => { if (banner.parentNode) banner.remove(); }, success ? 15000 : 20000);
+  if (hideMs) setTimeout(() => { if (banner.parentNode) banner.remove(); }, hideMs);
+}
+
+function showDeployBanner(labName, success) {
+  // Keep the success banner up while health is polling; it is replaced by
+  // renderBanner() once all nodes are ready or the poll times out. The long
+  // auto-hide is a safety net (e.g. if the lab is destroyed mid-poll).
+  renderBanner(
+    success
+      ? `✅ Deploy complete: ${labName} — ノード起動を待機中 (health polling)...`
+      : `❌ Deploy failed: ${labName}`,
+    success,
+    success ? HEALTH_POLL_TIMEOUT_MS + 30000 : 20000);
 }

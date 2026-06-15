@@ -284,6 +284,17 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
 textarea { width: 100%; height: 220px; resize: vertical; font-family: var(--font-mono); font-size: 11px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 4px; outline: none; margin-top: 6px; }
 
+/* ── Config Preview modal ── */
+.config-preview-body { max-height: 60vh; overflow: auto; }
+.cfg-preview-node { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; background: var(--bg3); }
+.cfg-preview-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.cfg-preview-node-id { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+.cfg-preview-node-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+.cfg-kind-badge { font-family: var(--font-mono); font-size: 9px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: var(--bg); border: 1px solid var(--accent2); color: var(--accent2); }
+.cfg-preview-file { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+.cfg-preview-pre { white-space: pre-wrap; word-break: break-all; font-family: var(--font-mono); font-size: 10px; line-height: 1.5; color: var(--text); background: var(--bg); padding: 8px 10px; margin: 0; border-radius: 0 0 6px 6px; max-height: 280px; overflow: auto; }
+.cfg-preview-none { font-family: var(--font-mono); font-size: 11px; color: var(--warn); padding: 8px 10px; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }

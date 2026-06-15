@@ -329,6 +329,61 @@ def apply_default_config(lab_name: str, template_id: str) -> dict:
             "lab_name": lab_name, "nodes": nodes}
 
 
+def _gui_labels(lab_name: str) -> dict:
+    """Map node_id -> GUI label from a deployed lab's clab YAML (best-effort).
+    Returns an empty dict if the lab file is missing or unparsable."""
+    out = {}
+    yaml_path = get_lab_path(lab_name) / f"{lab_name}.clab.yml"
+    if not yaml_path.exists():
+        return out
+    try:
+        clab = yaml.safe_load(yaml_path.read_text())
+        for nid, ndef in (clab.get("topology", {}).get("nodes", {}) or {}).items():
+            labels = (ndef or {}).get("labels", {}) or {}
+            out[nid] = labels.get("clab-gui-label", nid)
+    except Exception:
+        pass
+    return out
+
+
+def preview_default_config(lab_name: str, template_id: str) -> dict:
+    """Read (but do NOT apply) the per-node default config set for a template.
+
+    Mirrors apply_default_config's file resolution (configs/defaults/<template_id>/
+    <node_id>.cfg|.sh in _order.txt order) but only reads files — no device access.
+    Nodes listed in _order.txt without a matching file are returned with
+    content=None so the UI can show "設定なし". Used by the Preview Config UI."""
+    tdir = DEFAULTS_DIR / template_id
+    if not tdir.is_dir():
+        return {"success": False,
+                "error": f"No default config set for template '{template_id}'",
+                "lab_name": lab_name, "template_id": template_id, "nodes": []}
+
+    labels = _gui_labels(lab_name)
+    nodes = []
+    for node_id in _node_order(template_id, tdir):
+        cfg = tdir / f"{node_id}.cfg"
+        sh = tdir / f"{node_id}.sh"
+        if cfg.exists():
+            content, fname, ftype = cfg.read_text(), cfg.name, "cfg"
+        elif sh.exists():
+            content, fname, ftype = sh.read_text(), sh.name, "sh"
+        else:
+            content, fname, ftype = None, None, None
+        # kind from the live container when available (same resolution apply uses)
+        kind = util.node_kind(lab_name, node_id) or ""
+        nodes.append({
+            "node_id": node_id,
+            "kind": kind,
+            "label": labels.get(node_id, node_id),
+            "config_file": fname,
+            "type": ftype,
+            "content": content,
+        })
+    return {"success": True, "lab_name": lab_name,
+            "template_id": template_id, "nodes": nodes}
+
+
 # ── Resource guard ─────────────────────────────────────────────
 def _mem_available_gib() -> float:
     try:

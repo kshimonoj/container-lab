@@ -15,7 +15,7 @@ from lab_manager import (
     apply_default_config, deploy_lab, destroy_lab, estimate_resources,
     exec_command, export_topology_yaml, get_lab_status, get_node_live_info,
     get_node_ssh_info, get_radius_summary, import_topology_yaml, list_drivers,
-    list_labs, list_running_labs,
+    list_labs, list_running_labs, preview_default_config,
 )
 from templates import TEMPLATES
 
@@ -146,6 +146,16 @@ def api_apply_config(lab_name: str, payload: dict):
     if not template_id:
         raise HTTPException(status_code=400, detail="template_id is required")
     return apply_default_config(lab_name, template_id)
+
+
+@app.get("/api/labs/{lab_name}/config-preview")
+def api_config_preview(lab_name: str, template_id: str = ""):
+    """Preview (read-only) the default config set that Apply Config would push.
+    template_id is supplied by the GUI — the same source Apply Config uses.
+    Reads files only; performs no device access."""
+    if not template_id:
+        raise HTTPException(status_code=400, detail="template_id is required")
+    return preview_default_config(lab_name, template_id)
 
 
 # ── RADIUS summary (detail panel) ──────────────────────────────
