@@ -43,6 +43,12 @@ class NodeDriver:
         binds = node.get("binds")
         if binds:
             node_def["binds"] = list(binds)
+        # Optional containerlab node-level startup-delay (seconds). Used to stagger
+        # boot of multiple slow VMs (e.g. several AOS-CX) so they don't thrash and
+        # flip to unhealthy on a busy host.
+        delay = node.get("startup_delay")
+        if delay:
+            node_def["startup-delay"] = int(delay)
         return node_def
 
     # ── access ─────────────────────────────────────────────

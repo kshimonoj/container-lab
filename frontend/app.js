@@ -480,10 +480,27 @@ async function loadTemplates() {
     const res  = await fetch(`${API}/api/templates`);
     const data = await res.json();
     const sel  = document.getElementById('template-select');
+    // Group templates by vendor/category so mixed-vendor (CX × Junos)
+    // templates are visually separated from single-vendor ones.
+    const groups = {};
     data.templates.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id; opt.textContent = t.name;
-      sel.appendChild(opt);
+      const g = t.group || 'その他';
+      (groups[g] = groups[g] || []).push(t);
+    });
+    // Stable display order; any unlisted group is appended afterwards.
+    const order = ['AOS-CX 標準', 'Juniper', 'マルチベンダー (CX × Junos)', 'その他'];
+    const names = Object.keys(groups).sort(
+      (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+    names.forEach(g => {
+      const og = document.createElement('optgroup');
+      og.label = g;
+      groups[g].forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id; opt.textContent = t.name;
+        if (t.description) opt.title = t.description;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
     });
   } catch(e) { log('Failed to load templates: ' + e, 'error'); }
 }

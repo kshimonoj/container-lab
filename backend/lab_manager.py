@@ -445,6 +445,9 @@ def import_topology_yaml(yaml_content: str) -> dict:
             binds = node_def.get("binds")
             if binds:
                 node_entry["binds"] = binds
+            delay = node_def.get("startup-delay")
+            if delay:
+                node_entry["startup_delay"] = delay
             nodes.append(node_entry)
 
         links = []

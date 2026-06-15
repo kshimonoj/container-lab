@@ -33,7 +33,8 @@ async def root():
 @app.get("/api/templates")
 async def get_templates():
     return {"templates": [
-        {"id": k, "name": v["name"], "description": v["description"]}
+        {"id": k, "name": v["name"], "description": v["description"],
+         "group": v.get("group", "その他")}
         for k, v in TEMPLATES.items()
     ]}
 

@@ -1,0 +1,5 @@
+# core (vJunos) first, then edges (AOS-CX)
+vsw1
+vsw2
+cx1
+cx2
