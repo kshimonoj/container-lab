@@ -195,4 +195,38 @@ TEMPLATES = {
             {"source": "cx1", "target": "vsw1", "src_if": "1/1/1", "dst_if": "ge-0/0/0", "label": "trunk VLAN 10/20/30"},
         ]
     },
+
+    # ── [F] evpn-spine-leaf (EVPN-VXLAN L1: eBGP underlay) ────────
+    "evpn-spine-leaf": {
+        "name": "EVPN Spine-Leaf L1 (eBGP underlay)",
+        "group": "マルチベンダー (CX × Junos)",
+        "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×3. eBGP underlay (L1)。"
+                       "各 Leaf は両 Spine と eBGP ピアし loopback を相互広報、"
+                       "Spine が leaf loopback を中継する。EVPN/VXLAN は後続フェーズ。"
+                       "AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (vJunos)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (vJunos)", "kind": "juniper_vjunosswitch", "x": 560, "y": 120},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 60},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
+            {"id": "pc1",    "label": "PC1",             "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2",             "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3",             "kind": "linux", "x": 680, "y": 540},
+        ],
+        "links": [
+            # Spine1 -> Leaves (10.0.1.x/31)
+            {"source": "spine1", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            # Spine2 -> Leaves (10.0.2.x/31)
+            {"source": "spine2", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
+            # Leaves -> PCs (L1: access up only)
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
+        ]
+    },
 }
