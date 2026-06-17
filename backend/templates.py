@@ -196,15 +196,16 @@ TEMPLATES = {
         ]
     },
 
-    # ── [F] evpn-spine-leaf (EVPN-VXLAN L1 underlay + L2 EVPN CP) ────────
+    # ── [F] evpn-spine-leaf (EVPN-VXLAN L1 underlay + L2 EVPN CP + L3 VXLAN L2VNI) ──
     "evpn-spine-leaf": {
-        "name": "EVPN Spine-Leaf L2 (eBGP underlay + EVPN CP)",
+        "name": "EVPN-VXLAN Spine-Leaf L3 (L2VNI + Group 分離)",
         "group": "マルチベンダー (CX × Junos)",
         "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×3. eBGP underlay (L1) + "
-                       "Lean-Spine eBGP EVPN コントロールプレーン (L2)。各 Leaf は両 Spine と "
-                       "underlay eBGP、Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn を "
-                       "フルメッシュ。Spine は EVPN 不参加 (underlay 中継のみ)。VXLAN/VNI は L3。"
-                       "AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
+                       "Lean-Spine eBGP EVPN コントロールプレーン (L2) + VXLAN L2VNI データプレーン (L3)。"
+                       "Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn をフルメッシュ、Spine は "
+                       "EVPN 不参加 (underlay 中継のみ)。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
+                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。eBGP のため EVI ごとに手動 RT。"
+                       "VTEP source=loopback0。AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
         "nodes": [
             {"id": "spine1", "label": "Spine1 (vJunos)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
             {"id": "spine2", "label": "Spine2 (vJunos)", "kind": "juniper_vjunosswitch", "x": 560, "y": 120},
