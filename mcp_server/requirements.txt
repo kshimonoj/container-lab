@@ -1,0 +1,12 @@
+# CX-CLAB MCP server dependencies.
+# Install into the existing venv: ~/work/api-test-venv
+#   ~/work/api-test-venv/bin/pip install -r requirements.txt
+#
+# junos-eznc / ncclient / paramiko are already present in that venv
+# (added in Phase 07). They are listed here so the file is self-contained.
+
+fastmcp>=3.4           # FastMCP server, Streamable HTTP transport
+requests>=2.31         # AOS-CX REST v10.16 client
+junos-eznc>=2.7        # vJunos PyEZ (NETCONF 830)
+ncclient>=0.6          # PyEZ NETCONF dependency
+paramiko>=3.0          # SSH for AOS-CX CLI (show / conf-t)
