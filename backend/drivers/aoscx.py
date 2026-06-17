@@ -24,6 +24,22 @@ class AosCxDriver(NodeDriver):
     ram_gib = 8.0                          # vrnetlab aoscx allocates 8192 MB
     boot_hint = "AOS-CX boots in ~1 min"
 
+    # ── MCP export (see 07_api_feasibility: REST v10.16 Cookie login) ──
+    mcp_api_name = "REST API v10.16 (https)"
+    mcp_config_format = "CLI"
+    config_command = "show running-config"
+
+    def mcp_api_lines(self, host: str) -> list:
+        base = f"https://{host}/rest/v10.16"
+        return [
+            "- API: REST API v10.16",
+            f"  - base_url: {base}",
+            f"  - login: POST /login?username={self.default_username}"
+            f"&password={self.default_password} (Cookie 認証)",
+            f"  - fallback: SSH {self.default_username}@{host}:{self.ssh_port} "
+            f"(`show running-config`)",
+        ]
+
     # ── boot detection (log fallback; health is the primary signal) ──
     def is_booted(self, container_logs: str) -> bool:
         text = container_logs or ""

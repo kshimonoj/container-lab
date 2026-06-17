@@ -32,6 +32,20 @@ class VjunosSwitchDriver(NodeDriver):
     ram_gib = 5.0                      # vrnetlab vjunos allocates 5120 MB
     boot_hint = "vJunos boots in ~2-3 min (first boot can take longer)"
 
+    # ── MCP export (see 07_api_feasibility: NETCONF 830 / PyEZ) ──
+    mcp_api_name = "NETCONF 830 (PyEZ)"
+    mcp_config_format = "set"
+    config_command = "show configuration | display set"
+
+    def mcp_api_lines(self, host: str) -> list:
+        return [
+            "- API: NETCONF (port 830) / PyEZ",
+            f"  - user: {self.default_username} / pass: {self.default_password}",
+            f"  - connect: Device(host='{host}', user='{self.default_username}', "
+            f"passwd='{self.default_password}', port=830)",
+            "  - config 形式: set (変更は commit 前に diff 確認 / rollback 可)",
+        ]
+
     # ── boot detection (log fallback; health is the primary signal) ──
     def is_booted(self, container_logs: str) -> bool:
         text = container_logs or ""

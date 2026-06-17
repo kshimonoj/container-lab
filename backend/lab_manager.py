@@ -473,6 +473,120 @@ def export_topology_yaml(topology: dict, lab_name: str) -> str:
     return topology_to_clab_yaml(topology, lab_name)
 
 
+# ── MCP export (full lab context as a single Markdown file) ────
+def export_mcp_markdown(lab_name: str) -> str:
+    """Build a Markdown snapshot of a running lab for Claude Desktop / MCP.
+
+    Bundles, for the named lab: the topology (nodes/kinds/links from the clab
+    YAML), each node's live management IP (resolved at call time via docker
+    inspect — IPs are dynamic), per-kind API/auth info, each node's current
+    running config (best-effort; failures are skipped so the export still
+    succeeds), and the raw clab YAML. Raises FileNotFoundError if the lab's
+    YAML is missing."""
+    yaml_path = get_lab_path(lab_name) / f"{lab_name}.clab.yml"
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"Lab topology file not found: {yaml_path}")
+
+    yaml_text = yaml_path.read_text()
+    clab = yaml.safe_load(yaml_text) or {}
+    topo = clab.get("topology", {}) or {}
+    yaml_nodes = topo.get("nodes", {}) or {}
+    yaml_links = topo.get("links", []) or []
+
+    # Resolve per-node live facts (driver, kind, mgmt IP, label, running config).
+    nodes = []
+    for node_id, ndef in yaml_nodes.items():
+        ndef = ndef or {}
+        yaml_kind = ndef.get("kind", DEFAULT_KIND)
+        live_kind = util.node_kind(lab_name, node_id) or yaml_kind
+        driver = get_driver(live_kind)
+        mgmt_ip = util.get_container_ip(lab_name, node_id) or ""
+        labels = ndef.get("labels", {}) or {}
+        label = labels.get("clab-gui-label", node_id)
+        # running config is optional: never let a failure abort the export
+        try:
+            cfg = driver.get_running_config(lab_name, node_id)
+        except Exception as e:
+            cfg = {"ok": False, "format": driver.mcp_config_format,
+                   "text": "", "error": f"exception: {e}"}
+        creds = (f"{driver.default_username}/{driver.default_password}"
+                 if driver.default_username else "-")
+        nodes.append({
+            "id": node_id, "label": label, "kind": live_kind, "driver": driver,
+            "mgmt_ip": mgmt_ip, "api_name": driver.mcp_api_name or "SSH/CLI",
+            "creds": creds, "cfg": cfg,
+        })
+
+    template_id = clab.get("name", lab_name)
+    now = datetime.now().isoformat(timespec="seconds")
+
+    lines = []
+    lines.append(f"# Lab Export for MCP: {lab_name} ({template_id})")
+    lines.append(f"生成日時: {now}")
+    lines.append(f"ContainerLab トポロジ: {yaml_path}")
+    lines.append("")
+
+    # ── summary table ──
+    lines.append("## サマリ")
+    lines.append("| node_id | label | kind | mgmt_ip | API | 認証 |")
+    lines.append("|---------|-------|------|---------|-----|------|")
+    for n in nodes:
+        lines.append(f"| {n['id']} | {n['label']} | {n['kind']} | "
+                     f"{n['mgmt_ip'] or '(未解決)'} | {n['api_name']} | {n['creds']} |")
+    lines.append("")
+
+    # ── links ──
+    lines.append("## リンク")
+    if yaml_links:
+        for link in yaml_links:
+            eps = link.get("endpoints", []) or []
+            if len(eps) == 2:
+                extra = f"  (label: {link['label']})" if link.get("label") else ""
+                lines.append(f"- {eps[0]} ↔ {eps[1]}{extra}")
+    else:
+        lines.append("- (リンクなし)")
+    lines.append("")
+
+    # ── per-node detail ──
+    lines.append("## ノード詳細")
+    for n in nodes:
+        lines.append("")
+        lines.append(f"### {n['id']} ({n['driver'].display_name})")
+        lines.append(f"- kind: {n['kind']}")
+        lines.append(f"- mgmt_ip: {n['mgmt_ip'] or '(未解決)'}")
+        for api_ln in n["driver"].mcp_api_lines(n["mgmt_ip"]):
+            lines.append(api_ln)
+        cfg = n["cfg"]
+        fmt = f" ({cfg['format']} 形式)" if cfg.get("format") else ""
+        if cfg.get("ok") and cfg.get("text"):
+            lines.append(f"- 現在の config{fmt}:")
+            lines.append("```")
+            lines.append(cfg["text"])
+            lines.append("```")
+        else:
+            lines.append(f"- 現在の config{fmt}: 取得できませんでした "
+                         f"({cfg.get('error') or 'no output'})")
+    lines.append("")
+
+    # ── raw clab YAML ──
+    lines.append("## clab YAML (原文)")
+    lines.append("```yaml")
+    lines.append(yaml_text.rstrip())
+    lines.append("```")
+    lines.append("")
+
+    # ── MCP operation hints ──
+    lines.append("## MCP 操作のヒント")
+    lines.append("- 設定取得: get_node_config(mgmt_ip, kind)")
+    lines.append("- 設定投入: apply_config(mgmt_ip, kind, config, dry_run=true で diff 確認)")
+    lines.append("- show実行: run_show(mgmt_ip, kind, command)")
+    lines.append("- AOS-CX は CLI 形式 / vJunos は set 形式で config を渡すこと")
+    lines.append("- vJunos の設定変更は commit 前に必ず diff を確認 (dry_run=true)")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 def import_topology_yaml(yaml_content: str) -> dict:
     """Convert ContainerLab YAML to a GUI topology."""
     try:

@@ -1004,6 +1004,33 @@ function bindButtons() {
     } catch(e) { log('Export error: ' + e, 'error'); }
   };
 
+  // Export for MCP (full lab context as Markdown for Claude Desktop)
+  document.getElementById('btn-export-mcp').onclick = async () => {
+    const labName = currentLabName();
+    try {
+      // guard: only meaningful for a deployed/running lab
+      const st = await (await fetch(`${API}/api/labs/${labName}/status`)).json();
+      const running = (st.containers || []).length;
+      if (!running) {
+        log(`No running containers for "${labName}". Deploy the lab first.`, 'warn');
+        return;
+      }
+      log(`Exporting MCP context for "${labName}" (collecting live config)...`, 'info');
+      const res = await fetch(`${API}/api/labs/${labName}/export-mcp`);
+      if (!res.ok) {
+        let msg = res.status;
+        try { msg = (await res.json()).detail || msg; } catch(_) {}
+        log('Export for MCP failed: ' + msg, 'error');
+        return;
+      }
+      const md = await res.text();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
+      a.download = `${labName}-mcp-export.md`; a.click();
+      log(`MCP export downloaded: ${labName}-mcp-export.md`, 'success');
+    } catch(e) { log('Export for MCP error: ' + e, 'error'); }
+  };
+
   // Import YAML
   document.getElementById('btn-import-yaml').onclick = () =>
     document.getElementById('modal-import').classList.remove('hidden');

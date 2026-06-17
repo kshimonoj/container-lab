@@ -26,6 +26,22 @@ def clean_lines(text: str) -> list:
     return [ln.rstrip() for ln in strip_ansi(text).replace("\r", "").split("\n")]
 
 
+def clean_config_output(text: str, command: str) -> str:
+    """Tidy a `show ...` capture for embedding in the MCP export: drop the
+    echoed command line(s) and the trailing device prompt line. Best-effort —
+    leaves the body untouched if nothing obvious matches."""
+    lines = [ln.rstrip() for ln in strip_ansi(text).replace("\r", "").split("\n")]
+    cmd = command.strip()
+    # drop leading blank/echoed-command lines
+    while lines and (not lines[0].strip() or cmd in lines[0]):
+        lines.pop(0)
+    # drop the trailing device prompt (e.g. "sw01#", "admin@vsw1>") and blanks
+    while lines and (not lines[-1].strip()
+                     or re.match(r"^\S.*[#>]\s*$", lines[-1])):
+        lines.pop()
+    return "\n".join(lines)
+
+
 # ── docker / container inspection ──────────────────────────────
 def node_kind(lab_name: str, node_id: str) -> str:
     """Resolve a deployed node's containerlab kind from the container label

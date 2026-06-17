@@ -107,3 +107,47 @@ class NodeDriver:
         """Push config_text to the node. Returns
         {ok, applied_lines, errors, output_tail}. Override per vendor."""
         raise NotImplementedError
+
+    # ── MCP export support ─────────────────────────────────
+    # Short API/auth descriptor + config dialect used by the "Export for MCP"
+    # report (lab_manager.export_mcp_markdown). config_command is the single
+    # show command whose output is the node's current running config.
+    mcp_api_name: str = ""          # e.g. "REST API v10.16 (https)"
+    mcp_config_format: str = ""     # config dialect label, e.g. "CLI" / "set"
+    config_command: str = ""        # show command returning the running config
+
+    def mcp_api_lines(self, host: str) -> list:
+        """Markdown bullet lines describing how MCP reaches this node's API.
+        Default: SSH/CLI access. Override per vendor for REST/NETCONF detail."""
+        return [
+            f"- API: {self.mcp_api_name or 'SSH/CLI'}",
+            f"  - ssh: {self.default_username}@{host}:{self.ssh_port} / "
+            f"pass: {self.default_password}",
+        ]
+
+    def get_running_config(self, lab_name: str, node_id: str) -> dict:
+        """Best-effort retrieval of the node's current running config for export.
+        Returns {ok, format, text, error}. Failures are non-fatal — the caller
+        keeps the export going and just notes the error.
+
+        Default implementation: for VM/network-OS nodes with a config_command,
+        open one SSH session and capture that command's output (proven path,
+        reused from the detail panel). Other nodes report 'not supported'."""
+        fmt = self.mcp_config_format
+        if not self.is_vm or not self.config_command:
+            return {"ok": False, "format": fmt, "text": "",
+                    "error": "no running-config retrieval for this kind"}
+        host = util.get_container_ip(lab_name, node_id)
+        if not host:
+            return {"ok": False, "format": fmt, "text": "",
+                    "error": f"no mgmt IP for {node_id}"}
+        raw = util.run_show_commands(
+            host, self.ssh_port, self.default_username, self.default_password,
+            self.paging_cmds, {"cfg": self.config_command}, timeout=25,
+        )
+        text = util.strip_ansi(raw.get("cfg", ""))
+        if text.lstrip().startswith("[SSH error"):
+            return {"ok": False, "format": fmt, "text": "", "error": text.strip()}
+        return {"ok": True, "format": fmt,
+                "text": util.clean_config_output(text, self.config_command),
+                "error": ""}

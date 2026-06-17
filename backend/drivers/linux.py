@@ -25,6 +25,15 @@ class LinuxDriver(NodeDriver):
     def is_booted(self, container_logs: str) -> bool:
         return True  # plain containers are up as soon as they run
 
+    # ── MCP export ─────────────────────────────────────────
+    mcp_api_name = "docker exec (no network API)"
+
+    def mcp_api_lines(self, host: str) -> list:
+        return [
+            "- API: なし (plain container)",
+            f"  - shell: docker exec -it clab-<lab>-<node> /bin/sh  (mgmt_ip {host})",
+        ]
+
     # ── live info via docker exec (busybox ip) ─────────────
     def live_info(self, lab_name: str, node_id: str) -> dict:
         result = {

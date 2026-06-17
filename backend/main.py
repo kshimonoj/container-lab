@@ -13,9 +13,10 @@ from pydantic import BaseModel
 
 from lab_manager import (
     apply_default_config, deploy_lab, destroy_lab, estimate_resources,
-    exec_command, export_topology_yaml, get_lab_status, get_node_live_info,
-    get_node_ssh_info, get_radius_summary, import_topology_yaml, list_drivers,
-    list_labs, list_running_labs, preview_default_config,
+    exec_command, export_mcp_markdown, export_topology_yaml, get_lab_status,
+    get_node_live_info, get_node_ssh_info, get_radius_summary,
+    import_topology_yaml, list_drivers, list_labs, list_running_labs,
+    preview_default_config,
 )
 from templates import TEMPLATES
 
@@ -190,6 +191,25 @@ class ImportRequest(BaseModel):
 @app.post("/api/topology/import")
 async def topology_import(req: ImportRequest):
     return import_topology_yaml(req.yaml_content)
+
+
+# ── Export for MCP (full lab context as Markdown) ──────────────
+@app.get("/api/labs/{lab_name}/export-mcp")
+def export_mcp(lab_name: str):
+    """Return a Markdown snapshot of a running lab (topology, live mgmt IPs,
+    API/auth info, per-node running config, raw clab YAML) for attaching to a
+    Claude Desktop chat. Downloaded as <lab_name>-mcp-export.md."""
+    try:
+        md = export_mcp_markdown(lab_name)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"export failed: {e}")
+    filename = f"{lab_name}-mcp-export.md"
+    return PlainTextResponse(
+        md, media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── SSH info ───────────────────────────────────────────────────
