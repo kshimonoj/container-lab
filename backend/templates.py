@@ -196,16 +196,15 @@ TEMPLATES = {
         ]
     },
 
-    # ── [F] evpn-spine-leaf (EVPN-VXLAN L1 underlay + L2 EVPN CP + L3 VXLAN L2VNI) ──
+    # ── [F] evpn-spine-leaf (EVPN-VXLAN L1 underlay + L2 EVPN CP) ────────
     "evpn-spine-leaf": {
-        "name": "EVPN-VXLAN Spine-Leaf L3 (L2VNI + Group 分離)",
+        "name": "EVPN Spine-Leaf L2 (eBGP underlay + EVPN CP)",
         "group": "マルチベンダー (CX × Junos)",
         "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×3. eBGP underlay (L1) + "
-                       "Lean-Spine eBGP EVPN コントロールプレーン (L2) + VXLAN L2VNI データプレーン (L3)。"
-                       "Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn をフルメッシュ、Spine は "
-                       "EVPN 不参加 (underlay 中継のみ)。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
-                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。eBGP のため EVI ごとに手動 RT。"
-                       "VTEP source=loopback0。AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
+                       "Lean-Spine eBGP EVPN コントロールプレーン (L2)。各 Leaf は両 Spine と "
+                       "underlay eBGP、Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn を "
+                       "フルメッシュ。Spine は EVPN 不参加 (underlay 中継のみ)。VXLAN/VNI は L3。"
+                       "AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
         "nodes": [
             {"id": "spine1", "label": "Spine1 (vJunos)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
             {"id": "spine2", "label": "Spine2 (vJunos)", "kind": "juniper_vjunosswitch", "x": 560, "y": 120},
@@ -229,6 +228,45 @@ TEMPLATES = {
             {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
             {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
             {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": ""},
+        ]
+    },
+
+    # ── [G] evpn-spine-leaf-l3 (= [F] + VXLAN L2VNI データプレーン + Group 分離) ──
+    # L2 テンプレート evpn-spine-leaf と同一トポロジ (8ノード/9リンク)。
+    # config だけ VXLAN/VNI/RT/access-vlan/PC IP を追加した上位版。
+    "evpn-spine-leaf-l3": {
+        "name": "EVPN Spine-Leaf L3 (VXLAN + Group分離)",
+        "group": "マルチベンダー (CX × Junos)",
+        "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×3. eBGP underlay (L1) + "
+                       "Lean-Spine eBGP EVPN コントロールプレーン (L2) + VXLAN L2VNI データプレーン (L3)。"
+                       "Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn をフルメッシュ、Spine は "
+                       "EVPN 不参加 (underlay 中継のみ)。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
+                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
+                       "eBGP のため EVI ごとに手動 RT。VTEP source=loopback0。"
+                       "AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (vJunos)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (vJunos)", "kind": "juniper_vjunosswitch", "x": 560, "y": 120},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 60},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
+            {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 680, "y": 540},
+        ],
+        "links": [
+            # Spine1 -> Leaves (10.0.1.x/31)
+            {"source": "spine1", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            # Spine2 -> Leaves (10.0.2.x/31)
+            {"source": "spine2", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
+            # Leaves -> PCs (L3: access vlan 収容)
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
         ]
     },
 }
