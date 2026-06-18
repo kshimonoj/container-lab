@@ -66,6 +66,12 @@ const terminals = {};
 let nodeMeta = {};
 let runningLabsCache = [];   // result of /api/labs/running
 
+// Template caches (filled by loadTemplates) used to auto-select the template
+// that matches a loaded lab. templateList = [{id,name,group,description}];
+// templateNodeSets = { id: sorted lowercased node-id array }.
+let templateList     = [];
+let templateNodeSets = {};
+
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   initCytoscape();
@@ -92,6 +98,7 @@ async function restoreDeployedLab() {
     if (data.topology && data.topology.nodes.length > 0) {
       loadTopology(data.topology);
       log(`🔄 Restored deployed lab: ${labName}`, 'success');
+      autoSelectTemplate(data.topology, labName);
       if (data.is_deployed) {
         setStatus('running');
         await refreshStatus();
@@ -540,7 +547,90 @@ async function loadTemplates() {
       });
       sel.appendChild(og);
     });
+
+    // Cache each template's node-id set so a loaded lab can be matched to a
+    // template by structure (used by autoSelectTemplate). Best-effort: a failed
+    // detail fetch just leaves that template out of structural matching.
+    templateList = data.templates;
+    await Promise.all(data.templates.map(async t => {
+      try {
+        const r = await fetch(`${API}/api/templates/${t.id}`);
+        if (!r.ok) return;
+        const tpl = await r.json();
+        templateNodeSets[t.id] =
+          (tpl.nodes || []).map(n => String(n.id).toLowerCase()).sort();
+      } catch(_) { /* non-fatal */ }
+    }));
   } catch(e) { log('Failed to load templates: ' + e, 'error'); }
+}
+
+// Stable key for a set of node ids (order/case-insensitive) for comparison.
+function nodeIdSetKey(ids) {
+  return (ids || []).map(s => String(s).toLowerCase()).sort().join('\n');
+}
+
+// Guess the template that matches a freshly loaded lab and select it in the
+// TEMPLATES dropdown. This only fills the selection (a suggestion) — it never
+// applies config. Strategy:
+//   1) name match — the lab/topology name equals a template id (exact hit)
+//   2) structural match — the loaded node-id set equals exactly one template's
+//      node-id set. Ambiguous (>1) or no match → leave selection untouched.
+// Returns the chosen template id, or null when nothing could be inferred.
+function autoSelectTemplate(topo, labName) {
+  const sel = document.getElementById('template-select');
+  if (!sel) return null;
+
+  let chosen = null;
+  // 1) name match (deployed lab name, then any YAML name carried on the topo)
+  if (labName && Object.prototype.hasOwnProperty.call(templateNodeSets, labName)) {
+    chosen = labName;
+  } else if (topo && topo.name &&
+             Object.prototype.hasOwnProperty.call(templateNodeSets, topo.name)) {
+    chosen = topo.name;
+  }
+
+  // 2) structural (node-set) match — only when exactly one template matches
+  if (!chosen) {
+    const loadedKey = nodeIdSetKey((topo.nodes || []).map(n => n.id));
+    const matches = Object.keys(templateNodeSets).filter(id =>
+      templateNodeSets[id].length > 0 &&
+      nodeIdSetKey(templateNodeSets[id]) === loadedKey);
+    if (matches.length === 1) {
+      chosen = matches[0];
+    } else if (matches.length > 1) {
+      log(`ノード構成が複数テンプレート (${matches.join(', ')}) に一致したため自動選択しません`, 'info');
+    }
+  }
+
+  if (chosen) {
+    sel.value = chosen;
+    sel.dispatchEvent(new Event('change'));  // enable buttons, clear warnings
+    const name = (templateList.find(t => t.id === chosen) || {}).name || chosen;
+    log(`🎯 テンプレート "${chosen}" を自動選択しました (${name})`, 'success');
+    return chosen;
+  }
+  return null;
+}
+
+// Make a clear, non-silent warning when Apply/Preview is invoked with no
+// template selected: a visible inline toast, a highlighted dropdown, and the
+// existing LOG line. Solves the "pressed the button but nothing happened" feel.
+function warnTemplateRequired() {
+  log('⚠ テンプレートを選択してください — Apply/Preview には対象テンプレートが必要です', 'warn');
+  const sel = document.getElementById('template-select');
+  if (sel) {
+    sel.classList.remove('tpl-needs-select');
+    void sel.offsetWidth;            // restart the highlight animation
+    sel.classList.add('tpl-needs-select');
+    setTimeout(() => sel.classList.remove('tpl-needs-select'), 2400);
+    sel.focus();
+  }
+  const toast = document.getElementById('tpl-warn');
+  if (toast) {
+    toast.classList.remove('hidden');
+    clearTimeout(warnTemplateRequired._t);
+    warnTemplateRequired._t = setTimeout(() => toast.classList.add('hidden'), 3200);
+  }
 }
 
 // ── Log ──────────────────────────────────────────────────────
@@ -906,14 +996,30 @@ function bindButtons() {
   document.getElementById('btn-apply-config').onclick = applyConfig;
   // Preview Config (read-only view of what Apply Config would push)
   document.getElementById('btn-preview-config').onclick = previewConfig;
-  // Disabled until a template is selected
+  // Reflect template-selection state on the Apply/Preview buttons. We keep the
+  // buttons clickable even with no template so a click can surface a clear
+  // warning (warnTemplateRequired) instead of looking inert; the visual cue is
+  // a dimmed "needs-template" style + tooltip rather than the disabled attr.
   const applyBtn   = document.getElementById('btn-apply-config');
   const previewBtn = document.getElementById('btn-preview-config');
   const tplSelect  = document.getElementById('template-select');
   const syncApplyBtn = () => {
-    applyBtn.disabled = !tplSelect.value;
-    previewBtn.disabled = !tplSelect.value;
+    const hasTpl = !!tplSelect.value;
+    [applyBtn, previewBtn].forEach(b => {
+      b.classList.toggle('btn-needs-template', !hasTpl);
+      b.title = hasTpl
+        ? b.dataset.title || b.title
+        : 'テンプレートを選択してください';
+    });
+    if (hasTpl) {
+      const toast = document.getElementById('tpl-warn');
+      if (toast) toast.classList.add('hidden');
+      tplSelect.classList.remove('tpl-needs-select');
+    }
   };
+  // preserve original tooltips so they can be restored once a template is set
+  applyBtn.dataset.title   = applyBtn.title;
+  previewBtn.dataset.title = previewBtn.title;
   tplSelect.addEventListener('change', syncApplyBtn);
   syncApplyBtn();
 
@@ -1050,6 +1156,7 @@ function bindButtons() {
         document.getElementById('lab-name').value = data.lab_name;
         document.getElementById('modal-import').classList.add('hidden');
         log(`Imported: ${data.lab_name}`, 'success');
+        autoSelectTemplate(data.topology, data.lab_name);
       } else { log('Import error: ' + data.error, 'error'); }
     } catch(e) { log('Import error: ' + e, 'error'); }
   };
@@ -1180,7 +1287,7 @@ async function execCommand() {
 async function applyConfig() {
   const labName    = currentLabName();
   const templateId = document.getElementById('template-select').value;
-  if (!templateId) { log('Select a template first', 'warn'); return; }
+  if (!templateId) { warnTemplateRequired(); return; }
 
   const btn  = document.getElementById('btn-apply-config');
   const orig = btn.textContent;
@@ -1227,7 +1334,7 @@ async function applyConfig() {
 async function previewConfig() {
   const labName    = currentLabName();
   const templateId = document.getElementById('template-select').value;
-  if (!templateId) { log('Select a template first', 'warn'); return; }
+  if (!templateId) { warnTemplateRequired(); return; }
 
   log(`👁 Loading config preview for "${templateId}"...`, 'info');
   try {
@@ -1376,6 +1483,7 @@ async function loadRunningLab(labName) {
     document.getElementById('lab-name').value = labName;
     loadTopology(data.topology);   // nodes + links from YAML. Does not call Deploy
     log(`📥 Loaded running lab: ${labName} (${data.topology.nodes.length} nodes, no Deploy)`, 'success');
+    autoSelectTemplate(data.topology, labName);
     if (data.is_deployed) {
       setStatus('running');
       await refreshStatus();

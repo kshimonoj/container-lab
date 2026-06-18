@@ -312,6 +312,37 @@ textarea { width: 100%; height: 220px; resize: vertical; font-family: var(--font
 /* generic hidden (detail-content / raw, etc.) */
 .hidden { display: none !important; }
 
+/* ── Apply/Preview template-selection UX ── */
+/* Inline warning shown when Apply/Preview is pressed with no template chosen */
+.tpl-warn {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  background: rgba(227, 179, 65, 0.12);
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  animation: tpl-warn-pop 0.18s ease-out;
+}
+@keyframes tpl-warn-pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+/* Temporary highlight on the TEMPLATES dropdown to draw the eye */
+.tpl-needs-select {
+  border-color: var(--warn) !important;
+  animation: tpl-select-flash 0.6s ease-in-out 0s 3;
+}
+@keyframes tpl-select-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(227, 179, 65, 0); }
+  50%      { box-shadow: 0 0 0 3px rgba(227, 179, 65, 0.45); }
+}
+/* Dimmed cue when Apply/Preview have no template selected (still clickable) */
+.btn-needs-template { opacity: 0.55; }
+.btn-needs-template:hover { opacity: 0.8; }
+
 /* ── v5 additions ── */
 
 /* ── Log improvements ── */
