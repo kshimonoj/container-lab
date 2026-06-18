@@ -1,4 +1,4 @@
-# CX-CLAB MCP Server
+# clab-mcp Server
 
 An MCP (Model Context Protocol) server that lets **Claude Desktop** (on a
 Macbook) read and safely change the configuration of the ContainerLab nodes
@@ -14,7 +14,7 @@ This server is **independent of the GUI** (`backend/`, port 8888). It only
 GUI and runs as its own process/service.
 
 ```
-Macbook (Claude Desktop) ──HTTP:8765──▶ ks-server: cx-clab-mcp ──┬─REST/SSH──▶ AOS-CX  172.20.20.x
+Macbook (Claude Desktop) ──HTTP:8765──▶ ks-server: clab-mcp ──┬─REST/SSH──▶ AOS-CX  172.20.20.x
    (LAN 172.31.204.250)                                          └─NETCONF/SSH▶ vJunos  172.20.20.x
 ```
 
@@ -73,16 +73,16 @@ Set `MCP_TOKEN` in `.env` to that value. (`.env` is gitignored.)
 ```bash
 cd ~/work/container-lab/mcp_server
 ~/work/api-test-venv/bin/python server.py
-# -> cx-clab-mcp listening on http://0.0.0.0:8765/mcp  (auth: on)
+# -> clab-mcp listening on http://0.0.0.0:8765/mcp  (auth: on)
 ```
 
 ### Run as a service (systemd)
 ```bash
-sudo cp ~/work/container-lab/mcp_server/cx-clab-mcp.service /etc/systemd/system/
+sudo cp ~/work/container-lab/mcp_server/clab-mcp.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now cx-clab-mcp     # enable = start at boot
-systemctl status cx-clab-mcp
-journalctl -u cx-clab-mcp -f                 # follow logs
+sudo systemctl enable --now clab-mcp     # enable = start at boot
+systemctl status clab-mcp
+journalctl -u clab-mcp -f                 # follow logs
 ```
 This service is separate from the GUI; restarting one does not affect the other.
 
@@ -115,7 +115,7 @@ Use the server's LAN address and the **same token** as in `.env`:
 ```json
 {
   "mcpServers": {
-    "cx-clab": {
+    "clab-mcp": {
       "type": "http",
       "url": "http://172.31.204.250:8765/mcp",
       "headers": {
@@ -133,7 +133,7 @@ Notes:
   ```json
   {
     "mcpServers": {
-      "cx-clab": {
+      "clab-mcp": {
         "command": "npx",
         "args": ["-y", "mcp-remote", "http://172.31.204.250:8765/mcp",
                  "--header", "Authorization: Bearer PASTE_THE_SAME_MCP_TOKEN_HERE"]
@@ -141,7 +141,7 @@ Notes:
     }
   }
   ```
-- Restart Claude Desktop. `cx-clab` and its 5 tools should appear.
+- Restart Claude Desktop. `clab-mcp` and its 5 tools should appear.
 
 ---
 

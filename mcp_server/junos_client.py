@@ -117,7 +117,7 @@ def run_show(ip, command, username=DEFAULT_USER, password=DEFAULT_PASS):
 # ── writes ──────────────────────────────────────────────────────
 def apply_config(ip, config_set, dry_run=True,
                  username=DEFAULT_USER, password=DEFAULT_PASS,
-                 comment="cx-clab-mcp"):
+                 comment="clab-mcp"):
     """Load `set`-format config, return the diff. dry_run=True discards the
     candidate (no commit); dry_run=False commits it."""
     if not (config_set or "").strip():
@@ -168,7 +168,7 @@ def apply_config(ip, config_set, dry_run=True,
 
 
 def rollback(ip, n=1, username=DEFAULT_USER, password=DEFAULT_PASS,
-             comment="cx-clab-mcp rollback"):
+             comment="clab-mcp rollback"):
     """Roll back to a previous commit (n=1 = undo the last commit) and commit
     the rollback. Returns the diff that was applied."""
     try:

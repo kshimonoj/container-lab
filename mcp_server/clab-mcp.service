@@ -1,18 +1,18 @@
-# CX-CLAB MCP server — systemd unit (sample).
+# clab-mcp server — systemd unit (sample).
 #
 # Install (run as the kshimono user / with sudo as noted):
-#   sudo cp ~/work/container-lab/mcp_server/cx-clab-mcp.service \
-#           /etc/systemd/system/cx-clab-mcp.service
+#   sudo cp ~/work/container-lab/mcp_server/clab-mcp.service \
+#           /etc/systemd/system/clab-mcp.service
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now cx-clab-mcp
-#   systemctl status cx-clab-mcp
+#   sudo systemctl enable --now clab-mcp
+#   systemctl status clab-mcp
 #
-# This service is INDEPENDENT of the GUI (cx-clab-gui). Restarting one does not
+# This service is INDEPENDENT of the GUI (clab-gui). Restarting one does not
 # affect the other. It needs docker (to inspect/SSH the nodes) so it orders
 # after docker.service, but does not pull it in.
 
 [Unit]
-Description=CX-CLAB MCP server (AOS-CX / vJunos over Streamable HTTP)
+Description=clab-mcp server (AOS-CX / vJunos over Streamable HTTP)
 After=network-online.target docker.service
 Wants=network-online.target
 
@@ -26,7 +26,7 @@ ExecStart=/home/kshimono/work/api-test-venv/bin/python /home/kshimono/work/conta
 # Config (bind/port/token) is read from mcp_server/.env by the process itself.
 Restart=on-failure
 RestartSec=5
-# Logs go to the journal: journalctl -u cx-clab-mcp -f
+# Logs go to the journal: journalctl -u clab-mcp -f
 StandardOutput=journal
 StandardError=journal
 

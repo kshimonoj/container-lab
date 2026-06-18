@@ -30,7 +30,7 @@ aoscx-build.log
 # === backups created during 008-010 work ===
 *.bak
 *.bak.*
-cx-clab.bak.*
+clab.bak.*
 
 # === python / caches ===
 __pycache__/

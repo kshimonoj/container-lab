@@ -1,5 +1,5 @@
 # mcp_server/server.py
-"""CX-CLAB MCP server (FastMCP, Streamable HTTP).
+"""clab-mcp MCP server (FastMCP, Streamable HTTP).
 
 Exposes read + safe config-change tools for the ContainerLab nodes (AOS-CX and
 vJunos-switch) running on ks-server. Claude Desktop connects over the LAN and
@@ -52,7 +52,7 @@ def _route(kind):
     }
 
 
-mcp = FastMCP("cx-clab-mcp")
+mcp = FastMCP("clab-mcp")
 
 
 # ── tools ───────────────────────────────────────────────────────
@@ -182,6 +182,6 @@ if __name__ == "__main__":
     if not TOKEN:
         print("WARNING: MCP_TOKEN is empty - the server is UNAUTHENTICATED. "
               "Set MCP_TOKEN in .env.")
-    print(f"cx-clab-mcp listening on http://{HOST}:{PORT}{PATH}  "
+    print(f"clab-mcp listening on http://{HOST}:{PORT}{PATH}  "
           f"(auth: {'on' if TOKEN else 'OFF'})")
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")

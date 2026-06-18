@@ -1,8 +1,12 @@
-# CX ContainerLab GUI
+# clab — ContainerLab GUI
 
-A web GUI for building, deploying, and operating Aruba/HPE **AOS-CX** topologies on
-[ContainerLab](https://containerlab.dev/). Built with **FastAPI** (backend), and
-**Cytoscape.js** + **xterm.js** (frontend).
+A web GUI for building, deploying, and operating multi-vendor topologies on
+[ContainerLab](https://containerlab.dev/) — Aruba/HPE **AOS-CX** (`vr-aoscx`) and
+Juniper **vJunos-switch** (`juniper_vjunosswitch`). Built with **FastAPI** (backend),
+and **Cytoscape.js** + **xterm.js** (frontend).
+
+The optional **clab-mcp** server (see `mcp_server/`) lets Claude Desktop read and
+safely change node configs over the LAN.
 
 > ⚠️ This is a lab tool. It ships **no real credentials or secrets**. The factory-default
 > `admin/admin` AOS-CX login and a placeholder RADIUS shared secret are the only credentials

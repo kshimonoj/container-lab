@@ -1,4 +1,4 @@
-# CX-CLAB MCP server dependencies.
+# clab-mcp server dependencies.
 # Install into the existing venv: ~/work/api-test-venv
 #   ~/work/api-test-venv/bin/pip install -r requirements.txt
 #

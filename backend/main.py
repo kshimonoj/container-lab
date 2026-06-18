@@ -20,7 +20,7 @@ from lab_manager import (
 )
 from templates import TEMPLATES
 
-app = FastAPI(title="CX ContainerLab GUI")
+app = FastAPI(title="ContainerLab GUI (clab)")
 app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")
 
 

@@ -1,7 +1,7 @@
 services:
-  cx-clab-gui:
+  clab-gui:
     build: .
-    container_name: cx-clab-gui
+    container_name: clab-gui
     privileged: true
     network_mode: host
     pid: host

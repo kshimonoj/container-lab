@@ -1,4 +1,4 @@
-// app.js — CX ContainerLab GUI v5
+// app.js — ContainerLab GUI (clab) v5
 'use strict';
 
 const API = '';
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindExecBar();
   bindLabEnhancements();
   await loadRunningLabs();
-  log('CX ContainerLab GUI v6 ready', 'info');
+  log('ContainerLab GUI (clab) v6 ready', 'info');
   // auto-restore a deployed lab if one exists
   await restoreDeployedLab();
 });
