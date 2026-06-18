@@ -115,6 +115,8 @@ class NodeDriver:
     mcp_api_name: str = ""          # e.g. "REST API v10.16 (https)"
     mcp_config_format: str = ""     # config dialect label, e.g. "CLI" / "set"
     config_command: str = ""        # show command returning the running config
+    mcp_config_label: str = "現在の config"  # section title in the export;
+                                    # plain containers override with "現在のネットワーク状態"
 
     def mcp_api_lines(self, host: str) -> list:
         """Markdown bullet lines describing how MCP reaches this node's API.

@@ -26,13 +26,49 @@ class LinuxDriver(NodeDriver):
         return True  # plain containers are up as soon as they run
 
     # ── MCP export ─────────────────────────────────────────
-    mcp_api_name = "docker exec (no network API)"
+    mcp_api_name = "docker exec (読み取り可)"
+    # plain containers have no running-config; we export their live net state
+    mcp_config_label = "現在のネットワーク状態"
 
     def mcp_api_lines(self, host: str) -> list:
         return [
             "- API: なし (plain container)",
             f"  - shell: docker exec -it clab-<lab>-<node> /bin/sh  (mgmt_ip {host})",
+            "  - 操作: 読み取りは docker exec で ip/ping 等を実行可能 "
+            "(MCP の run_show 相当は未対応。現状は GUI の exec-terminal もしくは "
+            "手動 docker exec を使用)",
         ]
+
+    def get_running_config(self, lab_name: str, node_id: str) -> dict:
+        """Plain containers have no running-config; instead capture the node's
+        current live network state (read-only) via docker exec so the MCP
+        export reflects each PC's real IPs and routes. Failures (e.g. container
+        not running) are non-fatal: returns ok=False and the caller notes it."""
+        # (display header, shell command). `-br` is iproute2-only; BusyBox/alpine
+        # prints a usage blurb instead, so fall back to plain `ip addr` there.
+        cmds = [
+            ("ip -br addr", "ip -br addr 2>/dev/null || ip addr"),
+            ("ip route", "ip route"),
+        ]
+        sections = []
+        any_ok = False
+        for header, cmd in cmds:
+            out = util.docker_exec(lab_name, node_id, cmd).rstrip()
+            if out and not self._looks_like_exec_error(out):
+                any_ok = True
+            sections.append(f"# {header}\n{out}" if out else f"# {header}\n(出力なし)")
+        text = "\n".join(sections)
+        if not any_ok:
+            return {"ok": False, "format": "", "text": "",
+                    "error": "docker exec で状態取得できませんでした "
+                             "(コンテナ未起動の可能性)"}
+        return {"ok": True, "format": "", "text": text, "error": ""}
+
+    @staticmethod
+    def _looks_like_exec_error(out: str) -> bool:
+        markers = ("[error:", "No such container", "is not running",
+                   "Error response from daemon", "multi-call binary")
+        return any(m in out for m in markers)
 
     # ── live info via docker exec (busybox ip) ─────────────
     def live_info(self, lab_name: str, node_id: str) -> dict:

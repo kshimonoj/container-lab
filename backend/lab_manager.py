@@ -557,14 +557,15 @@ def export_mcp_markdown(lab_name: str) -> str:
         for api_ln in n["driver"].mcp_api_lines(n["mgmt_ip"]):
             lines.append(api_ln)
         cfg = n["cfg"]
+        cfg_label = getattr(n["driver"], "mcp_config_label", "現在の config")
         fmt = f" ({cfg['format']} 形式)" if cfg.get("format") else ""
         if cfg.get("ok") and cfg.get("text"):
-            lines.append(f"- 現在の config{fmt}:")
+            lines.append(f"- {cfg_label}{fmt}:")
             lines.append("```")
             lines.append(cfg["text"])
             lines.append("```")
         else:
-            lines.append(f"- 現在の config{fmt}: 取得できませんでした "
+            lines.append(f"- {cfg_label}{fmt}: 取得できませんでした "
                          f"({cfg.get('error') or 'no output'})")
     lines.append("")
 
@@ -582,6 +583,10 @@ def export_mcp_markdown(lab_name: str) -> str:
     lines.append("- show実行: run_show(mgmt_ip, kind, command)")
     lines.append("- AOS-CX は CLI 形式 / vJunos は set 形式で config を渡すこと")
     lines.append("- vJunos の設定変更は commit 前に必ず diff を確認 (dry_run=true)")
+    lines.append("- PC (linux) は REST/NETCONF を持たないため MCP の "
+                 "get_node_config/run_show の対象外。PC の現在状態は本 export の "
+                 "「現在のネットワーク状態」を参照すること。PC への設定変更は "
+                 "GUI の Apply Config (テンプレートの .sh) で行う")
     lines.append("")
 
     return "\n".join(lines)
