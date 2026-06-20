@@ -282,7 +282,9 @@ TEMPLATES = {
                        "overlay=iBGP EVPN AS65000 で Spine が Route Reflector・Leaf が RR クライアント。"
                        "Spine は VXLAN 不参加 (RR に徹する)。VTEP は Leaf のみ (source=loopback0)。"
                        "iBGP のため route-target は auto。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
-                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
+                       "Group2=VLAN20/VNI10020 (PC2@leaf2+PC4@leaf3)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
+                       "vrnetlab vr-aoscx は EVPN 動的 VTEP 学習が効かないため、各 Leaf の VNI 配下に "
+                       "static vtep-peer (対向 Leaf loopback) を補完して VXLAN データプレーンを疎通させる。"
                        "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。"
                        "マルチベンダー版 (eBGP/Lean Spine) との設計差を比較できる教材。",
         "nodes": [
@@ -293,7 +295,8 @@ TEMPLATES = {
             {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
             {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
             {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
-            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 680, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 620, "y": 540},
+            {"id": "pc4",    "label": "PC4 (G2)",        "kind": "linux", "x": 780, "y": 540},
         ],
         "links": [
             # Spine1 -> Leaves (10.0.1.x/31). Spine も AOS-CX なので 1/1/X 表記。
@@ -308,6 +311,7 @@ TEMPLATES = {
             {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
             {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
             {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf3", "target": "pc4", "src_if": "1/1/4", "dst_if": "eth1", "label": "G2/vlan20"},
         ]
     },
 
