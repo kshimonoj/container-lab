@@ -319,6 +319,54 @@ TEMPLATES = {
         ]
     },
 
+    # ── [G2a-mv] evpn-mv-dynamic (Multivendor EVPN-VXLAN, vJunos RR + CX Dynamic VTEP) ──
+    # evpn-allcx-dynamic と同一設計思想のマルチベンダー版。Spine だけ vJunos に置換。
+    # vJunos Spine×2 = EVPN Route Reflector (VTEP にならず EVPN 経路を反射するだけ)、
+    # AOS-CX Leaf×3 = RR クライアント兼 Dynamic VTEP。全ノード iBGP 単一 AS65000、underlay=OSPF。
+    # 鍵は send-community extended (RT=Extended Community が運ばれ vtep-peer 無しで動的学習)。
+    # vJunos boot が遅いため Spine を先に・Leaf を後に段階起動 (0/30/90/120/150s)。
+    "evpn-mv-dynamic": {
+        "name": "EVPN-VXLAN Multivendor Dynamic (vJunos RR + CX VTEP)",
+        "group": "マルチベンダー (CX × Junos)",
+        "description": "vJunos Spine×2 + AOS-CX Leaf×3 + PC×4。underlay=OSPF area0、"
+                       "overlay=iBGP EVPN AS65000。★vJunos Spine が EVPN Route Reflector、"
+                       "AOS-CX Leaf が RR クライアント兼 Dynamic VTEP。Spine は VTEP にならず "
+                       "EVPN Type-2/3 を反射するだけ (VXLAN encap/decap しない)。"
+                       "★Dynamic VTEP: Leaf に vtep-peer を一切書かず、send-community extended で "
+                       "運ばれる RT(BGP Extended Community) を使って動的に VTEP を学習する。"
+                       "Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、Group2=VLAN20/VNI10020 "
+                       "(PC2@leaf2+PC4@leaf3)。確認: show interface vxlan vteps で Origin=evpn / operational。"
+                       "vJunos RR 経由で AOS-CX 由来の EVPN 経路 (RT/Extended-community) が正しく反射されるかが "
+                       "マルチベンダー相互運用の確認ポイント。All-CX Dynamic 版 (evpn-allcx-dynamic) と設計思想が揃う。"
+                       "vJunos boot が遅いため startup-delay (0/30/90/120/150s) で段階起動。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (vJunos RR)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (vJunos RR)", "kind": "juniper_vjunosswitch", "x": 560, "y": 120, "startup_delay": 30},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340, "startup_delay": 90},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 120},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 150},
+            {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 620, "y": 540},
+            {"id": "pc4",    "label": "PC4 (G2)",        "kind": "linux", "x": 780, "y": 540},
+        ],
+        "links": [
+            # Spine1 (vJunos) -> Leaves (10.0.1.x/31). Spine は vJunos なので ge-0/0/X 表記。
+            {"source": "spine1", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            # Spine2 (vJunos) -> Leaves (10.0.2.x/31)
+            {"source": "spine2", "target": "leaf1", "src_if": "ge-0/0/0", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "ge-0/0/1", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "ge-0/0/2", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
+            # Leaves -> PCs (L3: access vlan 収容)
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf3", "target": "pc4", "src_if": "1/1/4", "dst_if": "eth1", "label": "G2/vlan20"},
+        ]
+    },
+
     # ── [G2b] vxlan-allcx-static (All-CX VXLAN, STATIC VTEP, no BGP) ────────
     # 同一トポロジ。BGP/EVPN を完全に削除し、Leaf の VXLAN に vtep-peer を明示する静的方式。
     "vxlan-allcx-static": {
