@@ -269,4 +269,70 @@ TEMPLATES = {
             {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
         ]
     },
+
+    # ── [G2] evpn-allcx (All-CX EVPN-VXLAN: OSPF underlay + iBGP EVPN RR) ──
+    # evpn-spine-leaf-l3 と同一トポロジ・同一 Group 要件 (8ノード/9リンク) を全ノード
+    # AOS-CX で構成。Aruba 公式リファレンス準拠で underlay=OSPF area0、overlay=iBGP
+    # (Spine=Route Reflector)。マルチベンダー版 (eBGP/Lean Spine) との比較教材。
+    "evpn-allcx": {
+        "name": "EVPN-VXLAN All-CX (OSPF underlay + iBGP)",
+        "group": "AOS-CX EVPN",
+        "description": "AOS-CX Spine×2 + AOS-CX Leaf×3 + PC×3 (全ノード AOS-CX)。"
+                       "Aruba 公式リファレンス準拠: underlay=OSPF area0 (loopback/VTEP 到達性)、"
+                       "overlay=iBGP EVPN AS65000 で Spine が Route Reflector・Leaf が RR クライアント。"
+                       "Spine は VXLAN 不参加 (RR に徹する)。VTEP は Leaf のみ (source=loopback0)。"
+                       "iBGP のため route-target は auto。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
+                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
+                       "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。"
+                       "マルチベンダー版 (eBGP/Lean Spine) との設計差を比較できる教材。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (AOS-CX)", "kind": "vr-aoscx", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (AOS-CX)", "kind": "vr-aoscx", "x": 560, "y": 120, "startup_delay": 30},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340, "startup_delay": 60},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 90},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
+            {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 680, "y": 540},
+        ],
+        "links": [
+            # Spine1 -> Leaves (10.0.1.x/31). Spine も AOS-CX なので 1/1/X 表記。
+            {"source": "spine1", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            # Spine2 -> Leaves (10.0.2.x/31)
+            {"source": "spine2", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
+            # Leaves -> PCs (L3: access vlan 収容)
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+        ]
+    },
+
+    # ── [H] cx-junos-ospf-pc-demo (OSPF PC-to-PC demo; before = NO OSPF) ──
+    "cx-junos-ospf-pc-demo": {
+        "name": "OSPF PC-to-PC demo (CX × Junos)",
+        "group": "マルチベンダー (CX × Junos)",
+        "description": "PC1 — sw01(AOS-CX) ==OSPF area0== sw02(vJunos) — PC2。"
+                       "初期 config は OSPF 無しの「before」状態のため、PC1→PC2 (10.0.2.10) は "
+                       "不通。デモ中に Apply Config / MCP で OSPF を追加すると疎通する。"
+                       "P2P 10.1.1.0/30、PC側 10.0.1.0/24 (gw .1) / 10.0.2.0/24 (gw .1)、"
+                       "lo0 sw01=1.1.1.1 / sw02=2.2.2.2。OSPF 追加手順は ospf-demo-answerkey.md。",
+        "nodes": [
+            {"id": "pc1",  "label": "PC1",           "kind": "linux",                "x": 120, "y": 300},
+            {"id": "sw01", "label": "sw01 (AOS-CX)", "kind": "vr-aoscx",             "x": 340, "y": 300},
+            {"id": "sw02", "label": "sw02 (vJunos)", "kind": "juniper_vjunosswitch", "x": 560, "y": 300},
+            {"id": "pc2",  "label": "PC2",           "kind": "linux",                "x": 780, "y": 300},
+        ],
+        "links": [
+            # PC1 -> sw01 (data link; PC uses eth1, eth0 is clab mgmt)
+            {"source": "pc1",  "target": "sw01", "src_if": "eth1",     "dst_if": "1/1/1",    "label": "10.0.1.0/24"},
+            # sw01 -> sw02 (OSPF area-0 P2P)
+            {"source": "sw01", "target": "sw02", "src_if": "1/1/2",    "dst_if": "ge-0/0/0", "label": "OSPF 10.1.1.0/30"},
+            # sw02 -> PC2
+            {"source": "sw02", "target": "pc2",  "src_if": "ge-0/0/1", "dst_if": "eth1",     "label": "10.0.2.0/24"},
+        ]
+    },
 }

@@ -1,0 +1,9 @@
+# Apply order: spines (AOS-CX RR) first, then leaves (AOS-CX VTEP), then PCs.
+spine1
+spine2
+leaf1
+leaf2
+leaf3
+pc1
+pc2
+pc3
