@@ -1,0 +1,11 @@
+# Apply order: spines (OSPF underlay) first, then leaves (OSPF + access vlan only), then PCs.
+# NOTE: overlay (VXLAN/EVPN) is intentionally NOT configured (before-state demo).
+spine1
+spine2
+leaf1
+leaf2
+leaf3
+pc1
+pc2
+pc3
+pc4

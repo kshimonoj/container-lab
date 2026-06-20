@@ -1,0 +1,10 @@
+# Apply order: spines (OSPF underlay only) first, then leaves (static VXLAN VTEP), then PCs.
+spine1
+spine2
+leaf1
+leaf2
+leaf3
+pc1
+pc2
+pc3
+pc4

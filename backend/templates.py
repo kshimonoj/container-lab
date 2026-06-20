@@ -274,23 +274,23 @@ TEMPLATES = {
         ]
     },
 
-    # ── [G2] evpn-allcx (All-CX EVPN-VXLAN: OSPF underlay + iBGP EVPN RR) ──
-    # evpn-spine-leaf-l3 と同一トポロジ・同一 Group 要件 (8ノード/9リンク) を全ノード
-    # AOS-CX で構成。Aruba 公式リファレンス準拠で underlay=OSPF area0、overlay=iBGP
-    # (Spine=Route Reflector)。マルチベンダー版 (eBGP/Lean Spine) との比較教材。
-    "evpn-allcx": {
-        "name": "EVPN-VXLAN All-CX (OSPF underlay + iBGP)",
+    # ── [G2a] evpn-allcx-dynamic (All-CX EVPN-VXLAN, DYNAMIC VTEP) ──────────
+    # 全ノード AOS-CX (Spine2 + Leaf3 + PC4)。underlay=OSPF area0、overlay=iBGP EVPN
+    # (Spine=RR)。各 Leaf/Spine の EVPN neighbor に send-community extended を入れることで
+    # RT(Extended Community) が運ばれ、vtep-peer 無しでも動的に VTEP を学習する (Origin=evpn)。
+    # vxlan-allcx-static / allcx-underlay-demo と同一トポロジ。3版で Static/Dynamic/Underlay を比較。
+    "evpn-allcx-dynamic": {
+        "name": "EVPN-VXLAN All-CX Dynamic VTEP (OSPF + iBGP RR)",
         "group": "AOS-CX EVPN",
-        "description": "AOS-CX Spine×2 + AOS-CX Leaf×3 + PC×3 (全ノード AOS-CX)。"
-                       "Aruba 公式リファレンス準拠: underlay=OSPF area0 (loopback/VTEP 到達性)、"
-                       "overlay=iBGP EVPN AS65000 で Spine が Route Reflector・Leaf が RR クライアント。"
-                       "Spine は VXLAN 不参加 (RR に徹する)。VTEP は Leaf のみ (source=loopback0)。"
-                       "iBGP のため route-target は auto。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
-                       "Group2=VLAN20/VNI10020 (PC2@leaf2+PC4@leaf3)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
-                       "vrnetlab vr-aoscx は EVPN 動的 VTEP 学習が効かないため、各 Leaf の VNI 配下に "
-                       "static vtep-peer (対向 Leaf loopback) を補完して VXLAN データプレーンを疎通させる。"
-                       "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。"
-                       "マルチベンダー版 (eBGP/Lean Spine) との設計差を比較できる教材。",
+        "description": "AOS-CX Spine×2 + AOS-CX Leaf×3 + PC×4 (全ノード AOS-CX)。"
+                       "underlay=OSPF area0、overlay=iBGP EVPN AS65000 (Spine=Route Reflector)。"
+                       "★Dynamic VTEP: 各 Leaf に vtep-peer を一切書かず、EVPN で動的学習させる。"
+                       "鍵は Spine/Leaf 双方の EVPN neighbor に send-community extended を入れること。"
+                       "これが無いと RT(BGP Extended Community) が運ばれず、Type-3 を受け取っても "
+                       "VTEP を生成できない (前回これを誤解して dynamic が動かないと判断していた)。"
+                       "Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、Group2=VLAN20/VNI10020 "
+                       "(PC2@leaf2+PC4@leaf3)。確認: show interface vxlan vteps で Origin=evpn / operational。"
+                       "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。",
         "nodes": [
             {"id": "spine1", "label": "Spine1 (AOS-CX)", "kind": "vr-aoscx", "x": 280, "y": 120},
             {"id": "spine2", "label": "Spine2 (AOS-CX)", "kind": "vr-aoscx", "x": 560, "y": 120, "startup_delay": 30},
@@ -312,6 +312,83 @@ TEMPLATES = {
             {"source": "spine2", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
             {"source": "spine2", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
             # Leaves -> PCs (L3: access vlan 収容)
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf3", "target": "pc4", "src_if": "1/1/4", "dst_if": "eth1", "label": "G2/vlan20"},
+        ]
+    },
+
+    # ── [G2b] vxlan-allcx-static (All-CX VXLAN, STATIC VTEP, no BGP) ────────
+    # 同一トポロジ。BGP/EVPN を完全に削除し、Leaf の VXLAN に vtep-peer を明示する静的方式。
+    "vxlan-allcx-static": {
+        "name": "VXLAN All-CX Static VTEP (OSPF underlay, no BGP)",
+        "group": "AOS-CX EVPN",
+        "description": "AOS-CX Spine×2 + AOS-CX Leaf×3 + PC×4 (全ノード AOS-CX)。"
+                       "★Static VTEP: BGP/EVPN を一切使わず (router bgp 無し)、underlay=OSPF area0 のみ。"
+                       "各 Leaf の interface vxlan 1 配下に vtep-peer (対向 Leaf loopback) を明示して "
+                       "VXLAN データプレーンを張る。leaf1<->leaf3 が VNI10010、leaf2<->leaf3 が VNI10020。"
+                       "Group1=VLAN10/VNI10010 (PC1+PC3)、Group2=VLAN20/VNI10020 (PC2+PC4)。"
+                       "確認: show interface vxlan vteps で Origin=static / operational、router bgp が無いこと。"
+                       "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。"
+                       "Dynamic 版 (evpn-allcx-dynamic) との制御プレーン有無の比較教材。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (AOS-CX)", "kind": "vr-aoscx", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (AOS-CX)", "kind": "vr-aoscx", "x": 560, "y": 120, "startup_delay": 30},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340, "startup_delay": 60},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 90},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
+            {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 620, "y": 540},
+            {"id": "pc4",    "label": "PC4 (G2)",        "kind": "linux", "x": 780, "y": 540},
+        ],
+        "links": [
+            {"source": "spine1", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            {"source": "spine2", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
+            {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
+            {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf3", "target": "pc4", "src_if": "1/1/4", "dst_if": "eth1", "label": "G2/vlan20"},
+        ]
+    },
+
+    # ── [G2c] allcx-underlay-demo (All-CX, underlay only; overlay via MCP later) ──
+    # 同一トポロジ。OSPF underlay だけを先に作り、overlay (VXLAN/EVPN/BGP) は未設定の
+    # before-state。PC 間は不通。後から MCP の apply_config で dynamic か static の overlay を
+    # 投入して開通する様子を見せるデモ用 (cx-junos-ospf-pc-demo と同じ「後付け」方式)。
+    "allcx-underlay-demo": {
+        "name": "All-CX Underlay only (demo, overlay via MCP later)",
+        "group": "AOS-CX EVPN",
+        "description": "AOS-CX Spine×2 + AOS-CX Leaf×3 + PC×4 (全ノード AOS-CX)。"
+                       "★Underlay のみ: OSPF area0 で loopback 到達性まで。VXLAN/EVPN/BGP overlay は未設定。"
+                       "Leaf の 1/1/3,1/1/4 は VLAN access まで設定するが、VNI が無いため Leaf 跨ぎは不通 "
+                       "(PC1->PC3 は通らない before-state)。デモでは MCP apply_config で overlay "
+                       "(dynamic か static のどちらか) を後から投入し、PC 間が開通する様子を見せる。"
+                       "投入する overlay 設定は allcx-underlay-demo-answerkey.md に dynamic/static 両方を用意。"
+                       "AOS-CX 5台は startup-delay (0/30/60/90/120s) で段階起動。",
+        "nodes": [
+            {"id": "spine1", "label": "Spine1 (AOS-CX)", "kind": "vr-aoscx", "x": 280, "y": 120},
+            {"id": "spine2", "label": "Spine2 (AOS-CX)", "kind": "vr-aoscx", "x": 560, "y": 120, "startup_delay": 30},
+            {"id": "leaf1",  "label": "Leaf1 (AOS-CX)",  "kind": "vr-aoscx", "x": 160, "y": 340, "startup_delay": 60},
+            {"id": "leaf2",  "label": "Leaf2 (AOS-CX)",  "kind": "vr-aoscx", "x": 420, "y": 340, "startup_delay": 90},
+            {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
+            {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
+            {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 620, "y": 540},
+            {"id": "pc4",    "label": "PC4 (G2)",        "kind": "linux", "x": 780, "y": 540},
+        ],
+        "links": [
+            {"source": "spine1", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/1", "label": "10.0.1.0/31"},
+            {"source": "spine1", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/1", "label": "10.0.1.2/31"},
+            {"source": "spine1", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/1", "label": "10.0.1.4/31"},
+            {"source": "spine2", "target": "leaf1", "src_if": "1/1/1", "dst_if": "1/1/2", "label": "10.0.2.0/31"},
+            {"source": "spine2", "target": "leaf2", "src_if": "1/1/2", "dst_if": "1/1/2", "label": "10.0.2.2/31"},
+            {"source": "spine2", "target": "leaf3", "src_if": "1/1/3", "dst_if": "1/1/2", "label": "10.0.2.4/31"},
             {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
             {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
             {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
