@@ -237,12 +237,14 @@ TEMPLATES = {
     "evpn-spine-leaf-l3": {
         "name": "EVPN Spine-Leaf L3 (VXLAN + Group分離)",
         "group": "マルチベンダー (CX × Junos)",
-        "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×3. eBGP underlay (L1) + "
+        "description": "JUNOS Spine×2 + AOS-CX Leaf×3 + PC×4. eBGP underlay (L1) + "
                        "Lean-Spine eBGP EVPN コントロールプレーン (L2) + VXLAN L2VNI データプレーン (L3)。"
                        "Leaf 同士は loopback 間 multihop eBGP で l2vpn evpn をフルメッシュ、Spine は "
                        "EVPN 不参加 (underlay 中継のみ)。Group1=VLAN10/VNI10010 (PC1@leaf1+PC3@leaf3)、"
-                       "Group2=VLAN20/VNI10020 (PC2@leaf2)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
+                       "Group2=VLAN20/VNI10020 (PC2@leaf2+PC4@leaf3)。同一 VNI のみ L2 疎通し別 Group は完全分離。"
                        "eBGP のため EVI ごとに手動 RT。VTEP source=loopback0。"
+                       "vrnetlab vr-aoscx は EVPN 動的 VTEP 学習が効かないため、各 Leaf の VNI 配下に "
+                       "static vtep-peer (対向 Leaf loopback) を補完して VXLAN データプレーンを疎通させる。"
                        "AOS-CX 3台は startup-delay (0/60/120s) で段階起動。",
         "nodes": [
             {"id": "spine1", "label": "Spine1 (vJunos)", "kind": "juniper_vjunosswitch", "x": 280, "y": 120},
@@ -252,7 +254,8 @@ TEMPLATES = {
             {"id": "leaf3",  "label": "Leaf3 (AOS-CX)",  "kind": "vr-aoscx", "x": 680, "y": 340, "startup_delay": 120},
             {"id": "pc1",    "label": "PC1 (G1)",        "kind": "linux", "x": 160, "y": 540},
             {"id": "pc2",    "label": "PC2 (G2)",        "kind": "linux", "x": 420, "y": 540},
-            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 680, "y": 540},
+            {"id": "pc3",    "label": "PC3 (G1)",        "kind": "linux", "x": 620, "y": 540},
+            {"id": "pc4",    "label": "PC4 (G2)",        "kind": "linux", "x": 780, "y": 540},
         ],
         "links": [
             # Spine1 -> Leaves (10.0.1.x/31)
@@ -267,6 +270,7 @@ TEMPLATES = {
             {"source": "leaf1", "target": "pc1", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
             {"source": "leaf2", "target": "pc2", "src_if": "1/1/3", "dst_if": "eth1", "label": "G2/vlan20"},
             {"source": "leaf3", "target": "pc3", "src_if": "1/1/3", "dst_if": "eth1", "label": "G1/vlan10"},
+            {"source": "leaf3", "target": "pc4", "src_if": "1/1/4", "dst_if": "eth1", "label": "G2/vlan20"},
         ]
     },
 
