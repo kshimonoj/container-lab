@@ -1,0 +1,11 @@
+# Apply order: vJunos spines first, then AOS-CX leaves, then PCs.
+# underlay (OSPF) only. overlay は evpn-mv-underlay-demo-answerkey.md を MCP で後投入。
+spine1
+spine2
+leaf1
+leaf2
+leaf3
+pc1
+pc2
+pc3
+pc4
