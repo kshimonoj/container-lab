@@ -21,6 +21,7 @@ import os
 import sys
 import time
 
+import paramiko
 import requests
 import urllib3
 
@@ -52,6 +53,67 @@ def _err(kind, msg, **extra):
     out = {"ok": False, "error_kind": kind, "error": str(msg)}
     out.update(extra)
     return out
+
+
+# ── SSH exec channel (read path: show / running-config) ────────────
+# The interactive-shell path (util.run_show_commands / invoke_shell) relies on
+# prompt/idle heuristics that hang on AOS-CX (long EULA banner shifts the buffer
+# so the output terminator is never detected -> ~240s MCP timeout). The exec
+# channel — `ssh host 'command'`, send one command and read stdout to EOF — is
+# what the proven 0.5s direct-SSH test uses, so the read tools use it here.
+# REST (get_node_facts) and the conf-t path (apply_config) are untouched.
+_BANNER_MARKERS = (
+    "Consistent with FAR",
+    "standard commercial license",
+    "RESTRICTED RIGHTS",
+)
+
+
+def _strip_login_banner(text: str) -> str:
+    """AOS-CX prints an EULA/MOTD banner before command output on some images.
+    Drop everything up to and including the last known banner-terminator line."""
+    lines = text.splitlines()
+    cut = 0
+    for i, ln in enumerate(lines):
+        if any(m in ln for m in _BANNER_MARKERS):
+            cut = i + 1
+    return "\n".join(lines[cut:]).strip("\n")
+
+
+def _ssh_exec(ip, command, username=DEFAULT_USER, password=DEFAULT_PASS,
+              connect_timeout=10, exec_timeout=25):
+    """Run one command over a fresh SSH exec channel and return its stdout text.
+
+    One command = one SSH session: no prompt/terminator detection, so it cannot
+    hang the way the interactive shell does. On any failure raises so the caller
+    can classify it — but never blocks past exec_timeout (no 4-minute hang)."""
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # host key changes on redeploy
+    try:
+        client.connect(
+            hostname=ip, port=SSH_PORT,
+            username=username, password=password,
+            look_for_keys=False, allow_agent=False,   # force password auth, no key-probe hang
+            timeout=connect_timeout, banner_timeout=15, auth_timeout=15,
+        )
+        stdin, stdout, stderr = client.exec_command(command, timeout=exec_timeout)
+        stdout.channel.settimeout(exec_timeout)
+        out = stdout.read().decode("utf-8", "replace")
+        err = stderr.read().decode("utf-8", "replace")
+        text = out if out.strip() else err
+        return _strip_login_banner(text)
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
+def _classify_ssh_error(exc) -> str:
+    """Map a paramiko/socket exception to the MCP error_kind vocabulary."""
+    if isinstance(exc, paramiko.AuthenticationException):
+        return "auth"
+    return "connect"
 
 
 # ── REST session ───────────────────────────────────────────────
@@ -183,26 +245,27 @@ def run_get(ip, path, username=DEFAULT_USER, password=DEFAULT_PASS):
 
 
 def get_running_config(ip, username=DEFAULT_USER, password=DEFAULT_PASS):
-    """Full running-config as CLI text (SSH `show running-config`)."""
+    """Full running-config as CLI text (SSH `show running-config`).
+
+    Uses the exec channel (one command per session). exec mode is non-interactive
+    so AOS-CX does not page the output — the full config is returned in one read.
+    """
     cmd = "show running-config"
-    raw = util.run_show_commands(ip, SSH_PORT, username, password,
-                                 PAGING_CMDS, {"cfg": cmd})
-    text = raw.get("cfg", "")
-    if text.startswith("[SSH error"):
-        kind = "auth" if "auth" in text.lower() else "connect"
-        return _err(kind, text)
+    try:
+        text = _ssh_exec(ip, cmd, username, password)
+    except Exception as e:
+        return _err(_classify_ssh_error(e), f"{type(e).__name__}: {e}")
     return {"ok": True, "format": "cli", "command": cmd,
             "text": util.clean_config_output(text, cmd)}
 
 
 def run_show(ip, command, username=DEFAULT_USER, password=DEFAULT_PASS):
     """Run an arbitrary `show ...` command over SSH and return its output."""
-    raw = util.run_show_commands(ip, SSH_PORT, username, password,
-                                 PAGING_CMDS, {"out": command})
-    text = raw.get("out", "")
-    if text.startswith("[SSH error"):
-        kind = "auth" if "auth" in text.lower() else "connect"
-        return _err(kind, text, command=command)
+    try:
+        text = _ssh_exec(ip, command, username, password)
+    except Exception as e:
+        return _err(_classify_ssh_error(e), f"{type(e).__name__}: {e}",
+                    command=command)
     return {"ok": True, "command": command,
             "output": util.clean_config_output(text, command)}
 
